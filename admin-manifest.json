@@ -1,0 +1,26 @@
+{
+  "name": "JOYIN Admin Panel",
+  "short_name": "JOYIN Admin",
+  "description": "Secure admin access for JOYIN social media platform",
+  "version": "1.0.0",
+  "start_url": "/admin/?source=pwa",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#5b53f2",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%235b53f2' width='192' height='192' rx='40'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='100' font-weight='900' fill='white'%3EJ%3C/text%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='20' fill='white' opacity='0.9'%3EADMIN%3C/text%3E%3C/svg%3E",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Crect fill='%235b53f2' width='512' height='512' rx='100'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='280' font-weight='900' fill='white'%3EJ%3C/text%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='50' fill='white' opacity='0.9'%3EADMIN%3C/text%3E%3C/svg%3E",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - JOYIN Admin</title>
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <header class="admin-header">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-crown" style="margin-right: 10px;"></i>JOYIN Admin
+            </div>
+            
+            <nav class="admin-nav">
+                <a href="dashboard.html" class="nav-link active">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </a>
+                <a href="users.html" class="nav-link">
+                    <i class="fas fa-users"></i> Users
+                </a>
+                <a href="posts.html" class="nav-link">
+                    <i class="fas fa-newspaper"></i> Posts
+                </a>
+                <a href="./Admin-feedback/feedback-admin.html" class="nav-link">
+                    <i class="fas fa-comment-dots"></i> Feedback
+                </a>
+                <button id="logoutBtn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="dashboard-content">
+        <h1 style="margin-bottom: 30px; color: var(--text);">
+            <i class="fas fa-tachometer-alt" style="color: var(--primary); margin-right: 10px;"></i>
+            Dashboard Overview
+        </h1>
+        
+        <!-- Stats Grid -->
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card loading" style="height: 120px;"></div>
+            <div class="stat-card loading" style="height: 120px;"></div>
+            <div class="stat-card loading" style="height: 120px;"></div>
+            <div class="stat-card loading" style="height: 120px;"></div>
+        </div>
+        
+        <!-- Charts Row -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 40px;">
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">
+                        <i class="fas fa-chart-bar" style="color: var(--primary); margin-right: 8px;"></i>
+                        Posts Per Day
+                    </div>
+                    <select id="chartRange" class="search-box" style="width: auto;">
+                        <option value="7">Last 7 days</option>
+                        <option value="30">Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                    </select>
+                </div>
+                <div style="padding: 20px;">
+                    <canvas id="postsChart" height="250"></canvas>
+                </div>
+            </div>
+            
+            <div class="table-container">
+                <div class="table-header">
+                    <div class="table-title">
+                        <i class="fas fa-user-chart" style="color: var(--primary); margin-right: 8px;"></i>
+                        User Activity
+                    </div>
+                </div>
+                <div style="padding: 20px;">
+                    <canvas id="usersChart" height="250"></canvas>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="table-container">
+            <div class="table-header">
+                <div class="table-title">
+                    <i class="fas fa-history" style="color: var(--primary); margin-right: 8px;"></i>
+                    Recent Activity
+                </div>
+            </div>
+            <table class="table" id="recentActivity">
+                <thead>
+                    <tr>
+                        <th>Time</th>
+                        <th>Action</th>
+                        <th>User</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="4" style="text-align: center; padding: 40px;">
+                            <div class="loading" style="height: 40px;"></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+
+    <script type="module">
+        import { getAdminStats, getAllPosts, getAllUsers } from './js/dashboard.js';
+        import { adminLogout, checkAdminAuth } from './js/auth.js';
+        
+        // Check admin auth
+        const user = await checkAdminAuth();
+        if (!user) {
+            window.location.href = 'index.html';
+        }
+        
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', adminLogout);
+        
+        // Load stats
+        async function loadDashboard() {
+            try {
+                const stats = await getAdminStats();
+                
+                // Update stats cards
+                document.getElementById('statsGrid').innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.totalUsers}</div>
+                        <div class="stat-label">Total Users</div>
+                        <div class="stat-change positive">
+                            <i class="fas fa-arrow-up"></i>
+                            ${stats.newUsersToday} new today
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.totalPosts}</div>
+                        <div class="stat-label">Total Posts</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.activeUsers}</div>
+                        <div class="stat-label">Active Users</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">${stats.bannedUsers}</div>
+                        <div class="stat-label">Banned Users</div>
+                    </div>
+                `;
+                
+                // Create posts chart
+                const postsCtx = document.getElementById('postsChart').getContext('2d');
+                const postsData = Object.entries(stats.postsByDate).slice(0, 7);
+                
+                new Chart(postsCtx, {
+                    type: 'line',
+                    data: {
+                        labels: postsData.map(d => d[0]),
+                        datasets: [{
+                            label: 'Posts',
+                            data: postsData.map(d => d[1]),
+                            borderColor: '#5b53f2',
+                            backgroundColor: 'rgba(91, 83, 242, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.4,
+                            fill: true
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: '#aaa' }
+                            },
+                            x: {
+                                grid: { color: 'rgba(255,255,255,0.1)' },
+                                ticks: { color: '#aaa' }
+                            }
+                        }
+                    }
+                });
+                
+                // Create users chart
+                const usersCtx = document.getElementById('usersChart').getContext('2d');
+                new Chart(usersCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Active', 'Banned'],
+                        datasets: [{
+                            data: [stats.activeUsers, stats.bannedUsers],
+                            backgroundColor: ['#5b53f2', '#ff4757'],
+                            borderWidth: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { color: '#fff' }
+                            }
+                        }
+                    }
+                });
+                
+                // Load recent activity (simplified)
+                document.getElementById('recentActivity').innerHTML = `
+                    <tbody>
+                        <tr>
+                            <td>Just now</td>
+                            <td><span class="status-badge badge-active">Login</span></td>
+                            <td>${user.email}</td>
+                            <td>Admin logged in</td>
+                        </tr>
+                        <tr>
+                            <td>2 hours ago</td>
+                            <td><span class="status-badge badge-banned">Ban</span></td>
+                            <td>@spammer123</td>
+                            <td>User banned for spam</td>
+                        </tr>
+                        <tr>
+                            <td>5 hours ago</td>
+                            <td><span class="status-badge badge-active">Delete</span></td>
+                            <td>Post #ABC123</td>
+                            <td>Inappropriate content removed</td>
+                        </tr>
+                    </tbody>
+                `;
+                
+            } catch (error) {
+                console.error('Dashboard error:', error);
+            }
+        }
+        
+        // Initialize
+        loadDashboard();
+        
+        // Refresh on range change
+        document.getElementById('chartRange').addEventListener('change', loadDashboard);
+        
+        // Auto refresh every 5 minutes
+        setInterval(loadDashboard, 5 * 60 * 1000);
+    </script>
+</body>
+</html>

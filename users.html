@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Management - JOYIN Admin</title>
+    <link rel="stylesheet" href="css/admin.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+    <header class="admin-header">
+        <div class="nav-container">
+            <div class="nav-logo">
+                <i class="fas fa-crown"></i> JOYIN Admin
+            </div>
+            
+            <nav class="admin-nav">
+                <a href="dashboard.html" class="nav-link">
+                    <i class="fas fa-chart-line"></i> Dashboard
+                </a>
+                <a href="users.html" class="nav-link active">
+                    <i class="fas fa-users"></i> Users
+                </a>
+                <a href="posts.html" class="nav-link">
+                    <i class="fas fa-newspaper"></i> Posts
+                </a>
+                <button id="logoutBtn" class="logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </nav>
+        </div>
+    </header>
+
+    <main class="dashboard-content">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <h1 style="color: var(--text);">
+                <i class="fas fa-users" style="color: var(--primary); margin-right: 10px;"></i>
+                User Management
+            </h1>
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="searchUsers" class="search-box" placeholder="Search users by name, email, or ID...">
+                <button id="exportUsers" class="action-btn btn-primary">
+                    <i class="fas fa-download"></i> Export
+                </button>
+            </div>
+        </div>
+        
+        <!-- Filters -->
+        <div class="table-container" style="margin-bottom: 20px; padding: 20px;">
+            <div style="display: flex; gap: 15px; align-items: center;">
+                <span style="color: var(--text-secondary);">Filter:</span>
+                <button id="filterAll" class="action-btn btn-primary">All Users</button>
+                <button id="filterActive" class="action-btn">Active Only</button>
+                <button id="filterBanned" class="action-btn">Banned Only</button>
+                <select id="sortUsers" class="search-box" style="width: auto; margin-left: auto;">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="name">By Name</option>
+                    <option value="posts">Most Posts</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Users Table -->
+        <div class="table-container">
+            <div class="table-header">
+                <div class="table-title">
+                    <i class="fas fa-user-friends"></i> Users (<span id="userCount">0</span> total)
+                </div>
+                <div>
+                    <button id="bulkBan" class="action-btn btn-danger" style="display: none;">
+                        <i class="fas fa-user-slash"></i> Ban Selected
+                    </button>
+                </div>
+            </div>
+            
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th style="width: 50px;">
+                            <input type="checkbox" id="selectAllUsers">
+                        </th>
+                        <th>User</th>
+                        <th>Email</th>
+                        <th>Status</th>
+                        <th>Posts</th>
+                        <th>Followers</th>
+                        <th>Joined</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="usersTable">
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 60px;">
+                            <div class="loading" style="height: 40px; margin: 0 auto;"></div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            
+            <!-- Pagination -->
+            <div style="padding: 20px; border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center;">
+                <div style="color: var(--text-secondary); font-size: 14px;">
+                    Showing <span id="showingCount">0</span> of <span id="totalCount">0</span> users
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="prevPage" class="action-btn" disabled>
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <span id="pageInfo" style="color: var(--text); padding: 8px 16px;">Page 1</span>
+                    <button id="nextPage" class="action-btn" disabled>
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- User Details Modal -->
+    <div id="userModal" class="modal-overlay" style="display: none;">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">User Details</h3>
+                <button class="close-modal" id="closeUserModal">&times;</button>
+            </div>
+            <div id="userDetails" style="max-height: 500px; overflow-y: auto;">
+                <!-- Dynamic content -->
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { getAllUsers, searchUsers } from './js/dashboard.js';
+        import { banUser, unbanUser, getUserPosts } from './js/users.js';
+        import { adminLogout, checkAdminAuth } from './js/auth.js';
+        
+        // Check admin auth
+        const user = await checkAdminAuth();
+        if (!user) window.location.href = 'index.html';
+        
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', adminLogout);
+        
+        let allUsers = [];
+        let filteredUsers = [];
+        let currentPage = 1;
+        const usersPerPage = 10;
+        let selectedUsers = new Set();
+        
+        // Load users
+        async function loadUsers() {
+            try {
+                allUsers = await getAllUsers();
+                applyFilters();
+                updateTable();
+            } catch (error) {
+                console.error('Error loading users:', error);
+                document.getElementById('usersTable').innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--danger);">
+                            <i class="fas fa-exclamation-triangle"></i> Failed to load users
+                        </td>
+                    </tr>
+                `;
+            }
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            let users = [...allUsers];
+            const searchTerm = document.getElementById('searchUsers').value.toLowerCase();
+            const sortBy = document.getElementById('sortUsers').value;
+            
+            // Search filter
+            if (searchTerm) {
+                users = users.filter(u => 
+                    (u.username || '').toLowerCase().includes(searchTerm) ||
+                    (u.email || '').toLowerCase().includes(searchTerm) ||
+                    u.id.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Status filters
+            const activeFilter = document.getElementById('filterActive');
+            const bannedFilter = document.getElementById('filterBanned');
+            
+            if (activeFilter.classList.contains('btn-primary')) {
+                users = users.filter(u => !(u.softBan === true || u.softBan === "true"));
+            } else if (bannedFilter.classList.contains('btn-primary')) {
+                users = users.filter(u => u.softBan === true || u.softBan === "true");
+            }
+            
+            // Sorting
+            switch(sortBy) {
+                case 'newest':
+                    users.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    break;
+                case 'oldest':
+                    users.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+                    break;
+                case 'name':
+                    users.sort((a, b) => (a.username || '').localeCompare(b.username || ''));
+                    break;
+                case 'posts':
+                    users.sort((a, b) => (b.postCount || 0) - (a.postCount || 0));
+                    break;
+            }
+            
+            filteredUsers = users;
+            currentPage = 1;
+        }
+        
+        // Update table
+        function updateTable() {
+            const start = (currentPage - 1) * usersPerPage;
+            const end = start + usersPerPage;
+            const pageUsers = filteredUsers.slice(start, end);
+            
+            document.getElementById('userCount').textContent = filteredUsers.length;
+            document.getElementById('totalCount').textContent = filteredUsers.length;
+            document.getElementById('showingCount').textContent = `${start + 1}-${Math.min(end, filteredUsers.length)}`;
+            
+            // Update pagination
+            document.getElementById('prevPage').disabled = currentPage === 1;
+            document.getElementById('nextPage').disabled = end >= filteredUsers.length;
+            document.getElementById('pageInfo').textContent = `Page ${currentPage}`;
+            
+            // Update table rows
+            const tbody = document.getElementById('usersTable');
+            tbody.innerHTML = '';
+            
+            if (pageUsers.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                            <i class="fas fa-user-slash"></i> No users found
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+            
+            pageUsers.forEach(user => {
+                const isBanned = user.softBan === true || user.softBan === "true";
+                const joinDate = user.createdAt?.toDate ? 
+                    user.createdAt.toDate().toLocaleDateString() : 
+                    new Date(user.createdAt).toLocaleDateString();
+                
+                tbody.innerHTML += `
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="user-checkbox" value="${user.id}" 
+                                   ${selectedUsers.has(user.id) ? 'checked' : ''}>
+                        </td>
+                        <td>
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <img src="${user.profilePic || 'https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3'}" 
+                                     class="user-avatar">
+                                <div>
+                                    <strong>${user.username || 'No username'}</strong><br>
+                                    <small style="color: var(--text-secondary);">${user.id.substring(0, 8)}...</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>${user.email || 'No email'}</td>
+                        <td>
+                            <span class="status-badge ${isBanned ? 'badge-banned' : 'badge-active'}">
+                                ${isBanned ? 'Banned' : 'Active'}
+                            </span>
+                        </td>
+                        <td>${user.postCount || 0}</td>
+                        <td>${user.followersCount || 0}</td>
+                        <td>${joinDate}</td>
+                        <td>
+                            <div style="display: flex; gap: 5px;">
+                                <button onclick="viewUserDetails('${user.id}')" class="action-btn" title="View Details">
+                                    <i class="fas fa-eye"></i>
+                                </button>
+                                <button onclick="toggleBanUser('${user.id}', ${isBanned})" 
+                                        class="action-btn ${isBanned ? 'btn-primary' : 'btn-warning'}"
+                                        title="${isBanned ? 'Unban User' : 'Ban User'}">
+                                    <i class="fas ${isBanned ? 'fa-user-check' : 'fa-user-slash'}"></i>
+                                </button>
+                                <button onclick="viewUserPosts('${user.id}')" class="action-btn btn-primary" title="View Posts">
+                                    <i class="fas fa-newspaper"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            // Update bulk ban button
+            document.getElementById('bulkBan').style.display = 
+                selectedUsers.size > 0 ? 'inline-block' : 'none';
+        }
+        
+        // View user details
+        window.viewUserDetails = async function(userId) {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return;
+            
+            const postsResult = await getUserPosts(userId);
+            const userPosts = postsResult.success ? postsResult.posts : [];
+            
+            document.getElementById('userDetails').innerHTML = `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <img src="${user.profilePic || 'https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3'}" 
+                         style="width: 100px; height: 100px; border-radius: 50%; border: 3px solid var(--primary);">
+                    <h3 style="margin-top: 10px;">${user.username || 'No username'}</h3>
+                    <p style="color: var(--text-secondary);">${user.email || 'No email'}</p>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                    <div class="stat-card" style="padding: 15px;">
+                        <div class="stat-label">User ID</div>
+                        <div style="color: var(--text); font-family: monospace; font-size: 12px;">${user.id}</div>
+                    </div>
+                    <div class="stat-card" style="padding: 15px;">
+                        <div class="stat-label">Status</div>
+                        <span class="status-badge ${user.softBan ? 'badge-banned' : 'badge-active'}">
+                            ${user.softBan ? 'Banned' : 'Active'}
+                        </span>
+                    </div>
+                    <div class="stat-card" style="padding: 15px;">
+                        <div class="stat-label">Posts</div>
+                        <div class="stat-value">${userPosts.length}</div>
+                    </div>
+                    <div class="stat-card" style="padding: 15px;">
+                        <div class="stat-label">Followers</div>
+                        <div class="stat-value">${user.followersCount || 0}</div>
+                    </div>
+                </div>
+                
+                ${user.bio ? `
+                    <div style="margin-bottom: 20px;">
+                        <div class="stat-label">Bio</div>
+                        <p style="color: var(--text);">${user.bio}</p>
+                    </div>
+                ` : ''}
+                
+                ${user.softBan ? `
+                    <div style="background: rgba(255, 71, 87, 0.1); padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                        <div class="stat-label" style="color: var(--danger);">Ban Reason</div>
+                        <p style="color: var(--text);">${user.banReason || 'No reason provided'}</p>
+                        <div class="stat-label" style="color: var(--danger); margin-top: 10px;">Banned Since</div>
+                        <p style="color: var(--text);">${new Date(user.banStartDate).toLocaleDateString()}</p>
+                    </div>
+                ` : ''}
+                
+                ${userPosts.length > 0 ? `
+                    <div style="margin-top: 20px;">
+                        <div class="table-title" style="margin-bottom: 10px;">Recent Posts</div>
+                        <div style="max-height: 200px; overflow-y: auto;">
+                            ${userPosts.slice(0, 5).map(post => `
+                                <div style="background: rgba(255,255,255,0.03); padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+                                    <div style="display: flex; justify-content: space-between;">
+                                        <span style="color: var(--text-secondary); font-size: 12px;">
+                                            ${new Date(post.createdAt?.toDate || post.createdAt).toLocaleDateString()}
+                                        </span>
+                                        <button onclick="deletePostFromModal('${post.id}')" 
+                                                class="action-btn btn-danger" style="padding: 4px 8px; font-size: 12px;">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                    <p style="margin-top: 5px; font-size: 14px;">${post.text?.substring(0, 100)}${post.text?.length > 100 ? '...' : ''}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                ` : ''}
+                
+                <div style="margin-top: 20px; display: flex; gap: 10px; justify-content: center;">
+                    <button onclick="toggleBanUser('${user.id}', ${!!user.softBan})" 
+                            class="action-btn ${user.softBan ? 'btn-primary' : 'btn-warning'}" style="flex: 1;">
+                        <i class="fas ${user.softBan ? 'fa-user-check' : 'fa-user-slash'}"></i>
+                        ${user.softBan ? 'Unban User' : 'Ban User'}
+                    </button>
+                    <button onclick="viewAllPosts('${user.id}')" class="action-btn btn-primary" style="flex: 1;">
+                        <i class="fas fa-list"></i> View All Posts
+                    </button>
+                </div>
+            `;
+            
+            document.getElementById('userModal').style.display = 'flex';
+        };
+        
+        // Toggle ban user
+        window.toggleBanUser = async function(userId, isCurrentlyBanned) {
+            if (confirm(isCurrentlyBanned ? 
+                'Unban this user? They will be able to post again.' : 
+                'Ban this user? They will not be able to post or interact.')) {
+                
+                const result = isCurrentlyBanned ? 
+                    await unbanUser(userId) : 
+                    await banUser(userId, 'Admin action');
+                
+                if (result.success) {
+                    alert(result.message);
+                    loadUsers(); // Refresh the list
+                    if (document.getElementById('userModal').style.display === 'flex') {
+                        viewUserDetails(userId); // Refresh modal
+                    }
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            }
+        };
+        
+        // View all posts by user
+        window.viewAllPosts = function(userId) {
+            window.location.href = `posts.html?user=${userId}`;
+        };
+        
+        // Delete post from modal
+        window.deletePostFromModal = function(postId) {
+            if (confirm('Delete this post?')) {
+                // This would require the posts module
+                alert('Post deletion would go here');
+            }
+        };
+        
+        // Close modal
+        document.getElementById('closeUserModal').addEventListener('click', () => {
+            document.getElementById('userModal').style.display = 'none';
+        });
+        
+        // Close modal on overlay click
+        document.getElementById('userModal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('userModal')) {
+                document.getElementById('userModal').style.display = 'none';
+            }
+        });
+        
+        // Filter buttons
+        document.getElementById('filterAll').addEventListener('click', function() {
+            document.querySelectorAll('#filterAll, #filterActive, #filterBanned').forEach(btn => {
+                btn.classList.remove('btn-primary');
+            });
+            this.classList.add('btn-primary');
+            applyFilters();
+            updateTable();
+        });
+        
+        document.getElementById('filterActive').addEventListener('click', function() {
+            document.querySelectorAll('#filterAll, #filterActive, #filterBanned').forEach(btn => {
+                btn.classList.remove('btn-primary');
+            });
+            this.classList.add('btn-primary');
+            applyFilters();
+            updateTable();
+        });
+        
+        document.getElementById('filterBanned').addEventListener('click', function() {
+            document.querySelectorAll('#filterAll, #filterActive, #filterBanned').forEach(btn => {
+                btn.classList.remove('btn-primary');
+            });
+            this.classList.add('btn-primary');
+            applyFilters();
+            updateTable();
+        });
+        
+        // Select all checkbox
+        document.getElementById('selectAllUsers').addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.user-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = this.checked;
+                if (this.checked) {
+                    selectedUsers.add(cb.value);
+                } else {
+                    selectedUsers.delete(cb.value);
+                }
+            });
+            updateBulkButton();
+        });
+        
+        // Individual checkbox
+        document.addEventListener('change', function(e) {
+            if (e.target.classList.contains('user-checkbox')) {
+                if (e.target.checked) {
+                    selectedUsers.add(e.target.value);
+                } else {
+                    selectedUsers.delete(e.target.value);
+                    document.getElementById('selectAllUsers').checked = false;
+                }
+                updateBulkButton();
+            }
+        });
+        
+        function updateBulkButton() {
+            document.getElementById('bulkBan').style.display = 
+                selectedUsers.size > 0 ? 'inline-block' : 'none';
+            document.getElementById('bulkBan').innerHTML = `
+                <i class="fas fa-user-slash"></i> Ban Selected (${selectedUsers.size})
+            `;
+        }
+        
+        // Bulk ban
+        document.getElementById('bulkBan').addEventListener('click', async function() {
+            if (selectedUsers.size === 0) return;
+            
+            if (confirm(`Ban ${selectedUsers.size} selected user(s)?`)) {
+                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+                this.disabled = true;
+                
+                for (const userId of selectedUsers) {
+                    await banUser(userId, 'Bulk admin action');
+                }
+                
+                selectedUsers.clear();
+                loadUsers();
+                this.disabled = false;
+            }
+        });
+        
+        // Search
+        document.getElementById('searchUsers').addEventListener('input', () => {
+            applyFilters();
+            updateTable();
+        });
+        
+        // Sort
+        document.getElementById('sortUsers').addEventListener('change', () => {
+            applyFilters();
+            updateTable();
+        });
+        
+        // Pagination
+        document.getElementById('prevPage').addEventListener('click', () => {
+            if (currentPage > 1) {
+                currentPage--;
+                updateTable();
+            }
+        });
+        
+        document.getElementById('nextPage').addEventListener('click', () => {
+            if (currentPage * usersPerPage < filteredUsers.length) {
+                currentPage++;
+                updateTable();
+            }
+        });
+        
+        // Export users
+        document.getElementById('exportUsers').addEventListener('click', () => {
+            const data = filteredUsers.map(u => ({
+                ID: u.id,
+                Username: u.username || '',
+                Email: u.email || '',
+                Status: u.softBan ? 'Banned' : 'Active',
+                Posts: u.postCount || 0,
+                Followers: u.followersCount || 0,
+                Joined: new Date(u.createdAt).toLocaleDateString()
+            }));
+            
+            const csv = convertToCSV(data);
+            downloadCSV(csv, 'joyin-users.csv');
+        });
+        
+        function convertToCSV(data) {
+            const headers = Object.keys(data[0]).join(',');
+            const rows = data.map(row => Object.values(row).map(v => 
+                `"${String(v).replace(/"/g, '""')}"`
+            ).join(','));
+            return [headers, ...rows].join('\n');
+        }
+        
+        function downloadCSV(csv, filename) {
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            window.URL.revokeObjectURL(url);
+        }
+        
+        // Initialize
+        loadUsers();
+    </script>
+</body>
+</html>
