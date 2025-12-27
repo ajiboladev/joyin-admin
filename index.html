@@ -15,28 +15,21 @@
     <meta name="theme-color" content="#5b53f2">
     <meta name="msapplication-TileColor" content="#5b53f2">
     <meta name="msapplication-navbutton-color" content="#5b53f2">
-    
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/admin-manifest.json">
 
-
-
-
-    <!-- Web App Manifest -->
+<!-- Web App Manifest (ONLY ONCE) -->
 <link rel="manifest" href="/admin-manifest.json">
 <meta name="theme-color" content="#5b53f2">
 <meta name="apple-mobile-web-app-capable" content="yes">
 
+<!-- iOS Support -->
+<link rel="apple-touch-icon" href="/J _ A192.png">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 
-<link rel="manifest" href="/admin-manifest.json">
-<meta name="theme-color" content="#5b53f2">
-<script src="/pwa-install.js"></script>
+<!-- ADMIN SPECIFIC PWA SCRIPT -->
+<script src="/admin-pwa-install.js"></script>
 
 
 
-
-    
     <style>
         * {
             margin: 0;
@@ -535,10 +528,10 @@
     </script>
 
       <!-- PWA Installation Script -->
-    <script src="/pwa-install.js"></script>
+    <!-- <script src="/pwa-install.js"></script> -->
     
     <!-- Register Service Worker -->
-    <script>
+    <!-- <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/admin-sw.js')
@@ -550,6 +543,6 @@
                     });
             });
         }
-    </script>
+    </script> -->
  </body>
  </html>
