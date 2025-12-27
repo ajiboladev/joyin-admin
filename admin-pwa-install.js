@@ -113,7 +113,7 @@ function showUpdatePrompt() {
     window.location.reload();
   });
   
-  // Auto-reload after 10 seconds
+  // Auto-reload after 30 seconds
   setTimeout(() => {
     window.location.reload();
   }, 30000);
@@ -155,7 +155,7 @@ function showUpdateSuccessMessage(version) {
   setTimeout(() => {
     successMsg.style.animation = 'slideOutUp 0.5s ease';
     setTimeout(() => successMsg.remove(), 500);
-  }, 4000);
+  }, 5000);
 }
 
 // ============================================
@@ -182,7 +182,7 @@ function showInstallButton() {
     `;
     installButton.style.cssText = `
       position: fixed;
-      bottom: 80px;
+      bottom: 70px;
       right: 20px;
       background: #5b53f2;
       color: white;
