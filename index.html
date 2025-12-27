@@ -23,6 +23,19 @@
 
 
 
+    <!-- Web App Manifest -->
+<link rel="manifest" href="/admin-manifest.json">
+<meta name="theme-color" content="#5b53f2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+
+<link rel="manifest" href="/admin-manifest.json">
+<meta name="theme-color" content="#5b53f2">
+<script src="/pwa-install.js"></script>
+
+
+
+
     
     <style>
         * {
@@ -456,33 +469,9 @@
         </div>
     </div>
 
-    <!-- Install App Section -->
-    <div class="install-container" id="installContainer" style="display: none;">
-                <button class="install-btn" id="installBtn">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Install Admin App
-                </button>
-            </div>
-
-            <!-- Success Message -->
-            <div class="install-success" id="installSuccess" style="display: none;">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-                    <polyline points="22 4 12 14.01 9 11.01"/>
-                </svg>
-                App installed successfully!
-            </div>
-
-            <!-- PWA Installation Script -->
-    <script src="/pwa-install.js"></script>
+   
+            
     
-    <!-- Service worker registration handled in pwa-install.js -->
-
-
     <script>
         // Update progress percentage
         const progressFill = document.querySelector('.progress-fill');
@@ -545,7 +534,22 @@
         console.log('%c🚀 Preparing dashboard...', 'color: #5b53f2;');
     </script>
 
-</body>
-</html>
+      <!-- PWA Installation Script -->
+    <script src="/pwa-install.js"></script>
+    
+    <!-- Register Service Worker -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/admin-sw.js')
+                    .then(registration => {
+                        console.log('✅ Service Worker registered:', registration.scope);
+                    })
+                    .catch(error => {
+                        console.error('❌ Service Worker registration failed:', error);
+                    });
+            });
+        }
+    </script>
  </body>
  </html>

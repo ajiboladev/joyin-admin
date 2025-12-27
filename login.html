@@ -6,11 +6,10 @@
     <title>JOYIN Admin - Login</title>
     <link rel="stylesheet" href="css/admin.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-   <link rel="manifest" href="/admin-manifest.json">
-<meta name="theme-color" content="#5b53f2">
-<script src="/pwa-install.js"></script>
-    
+    <link rel="icon" type="image/x-icon" href="/J _ A192.png">
+    <link rel="manifest" href="/admin-manifest.json">
+    <meta name="theme-color" content="#5b53f2">
+    <script src="/pwa-install.js"></script>
 </head>
 <body>
     <div class="login-container">
@@ -31,45 +30,74 @@
                     <input type="password" id="password" placeholder="••••••••" required>
                 </div>
                 
+                <!-- ERROR MESSAGE ELEMENT WAS MISSING -->
+                <div id="errorMessage" style="color: red; display: none; margin: 10px 0; padding: 10px; background: rgba(255,0,0,0.1); border-radius: 5px;"></div>
+                
                 <button type="submit" class="login-btn">
                     <i class="fas fa-sign-in-alt"></i> Sign In
                 </button>
-                
-              
-
-           
-   
+            </form> <!-- FORM WAS NOT CLOSED -->
+        </div> <!-- LOGIN-CARD WAS NOT CLOSED -->
+    </div> <!-- LOGIN-CONTAINER WAS NOT CLOSED -->
+    
     <!-- Login Script -->
     <script type="module">
-        import { adminLogin } from './js/auth.js';
+        // FIRST: Add error logging
+        console.log('Auth script loading...');
         
-        document.getElementById('loginForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
+        // Try with error handling
+        import { adminLogin } from './js/auth.js';
+        try {
             
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const errorMessage = document.getElementById('errorMessage');
-            const submitBtn = e.target.querySelector('button');
+            console.log('Auth module loaded successfully');
             
-            // Show loading
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
-            submitBtn.disabled = true;
-            errorMessage.style.display = 'none';
-            
-            const result = await adminLogin(email, password);
-            
-            if (result.success) {
-                submitBtn.innerHTML = '<i class="fas fa-check"></i> Success! Redirecting...';
-                setTimeout(() => {
-                    window.location.href = 'dashboard.html';
-                }, 1000);
-            } else {
-                submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-                submitBtn.disabled = false;
-                errorMessage.textContent = result.error || 'Login failed';
-                errorMessage.style.display = 'block';
-            }
-        });
+            document.getElementById('loginForm').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                console.log('Form submitted');
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const errorMessage = document.getElementById('errorMessage');
+                const submitBtn = e.target.querySelector('button');
+                
+                console.log('Attempting login for:', email);
+                
+                // Show loading
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
+                submitBtn.disabled = true;
+                errorMessage.style.display = 'none';
+                
+                try {
+                    const result = await adminLogin(email, password);
+                    console.log('Login result:', result);
+                    
+                    if (result.success) {
+                        submitBtn.innerHTML = '<i class="fas fa-check"></i> Success! Redirecting...';
+                        setTimeout(() => {
+                            window.location.href = 'dashboard.html';
+                        }, 1000);
+                    } else {
+                        submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+                        submitBtn.disabled = false;
+                        errorMessage.textContent = result.error || 'Login failed';
+                        errorMessage.style.display = 'block';
+                        console.error('Login error:', result.error);
+                    }
+                } catch (loginError) {
+                    submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+                    submitBtn.disabled = false;
+                    errorMessage.textContent = 'System error: ' + loginError.message;
+                    errorMessage.style.display = 'block';
+                    console.error('Login catch error:', loginError);
+                }
+            });
+        } catch (importError) {
+            console.error('Failed to load auth module:', importError);
+            document.getElementById('loginForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                alert('Authentication system not loaded. Check console for errors.');
+            });
+        }
     </script>
 </body>
 </html>
