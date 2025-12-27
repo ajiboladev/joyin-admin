@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PWA Debug - JOYIN</title>
+    <meta name="theme-color" content="#5b53f2">
+    <link rel="manifest" href="/admin-manifest.json">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #5b53f2;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+        
+        h2 {
+            color: #5b53f2;
+            margin: 30px 0 15px 0;
+            font-size: 20px;
+        }
+        
+        .status-box {
+            background: rgba(91, 83, 242, 0.1);
+            border: 2px solid #5b53f2;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+            padding: 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 5px;
+        }
+        
+        .status-icon {
+            font-size: 24px;
+        }
+        
+        .error {
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+        
+        .success {
+            border-color: #10b981;
+            background: rgba(16, 185, 129, 0.1);
+        }
+        
+        .warning {
+            border-color: #f59e0b;
+            background: rgba(245, 158, 11, 0.1);
+        }
+        
+        button {
+            background: #5b53f2;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin: 10px 10px 10px 0;
+            transition: all 0.3s ease;
+        }
+        
+        button:hover {
+            background: #4a43d1;
+            transform: translateY(-2px);
+        }
+        
+        pre {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 13px;
+            margin: 10px 0;
+        }
+        
+        .log {
+            max-height: 300px;
+            overflow-y: auto;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+        
+        .log-entry {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .code-block {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            border-left: 3px solid #5b53f2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 JOYIN PWA Debug Tool</h1>
+        
+        <div class="status-box" id="main-status">
+            <h2>Status Checks</h2>
+            <div id="status-checks"></div>
+        </div>
+        
+        <div class="status-box">
+            <h2>Quick Actions</h2>
+            <button onclick="testManifest()">🔍 Check Manifest</button>
+            <button onclick="testServiceWorker()">⚙️ Check Service Worker</button>
+            <button onclick="testHTTPS()">🔒 Check HTTPS</button>
+            <button onclick="forceInstallPrompt()">📱 Force Install Prompt</button>
+            <button onclick="clearAll()">🗑️ Clear All Cache</button>
+        </div>
+        
+        <div class="status-box">
+            <h2>Console Log</h2>
+            <div class="log" id="console-log"></div>
+        </div>
+        
+        <div class="status-box">
+            <h2>📋 Requirements Checklist</h2>
+            <div id="requirements"></div>
+        </div>
+        
+        <div class="status-box">
+            <h2>🛠️ Common Fixes</h2>
+            <div id="fixes"></div>
+        </div>
+    </div>
+
+    <script>
+        // Logging system
+        const logs = [];
+        function addLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            logs.push({ timestamp, message, type });
+            updateLogDisplay();
+            console.log(`[${timestamp}] ${message}`);
+        }
+        
+        function updateLogDisplay() {
+            const logContainer = document.getElementById('console-log');
+            logContainer.innerHTML = logs.map(log => 
+                `<div class="log-entry" style="color: ${
+                    log.type === 'error' ? '#ef4444' : 
+                    log.type === 'success' ? '#10b981' : 
+                    log.type === 'warning' ? '#f59e0b' : '#ffffff'
+                }">[${log.timestamp}] ${log.message}</div>`
+            ).reverse().join('');
+        }
+
+        // Status check functions
+        async function runAllChecks() {
+            const checks = [];
+            
+            // Check 1: HTTPS
+            const isHTTPS = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+            checks.push({
+                name: 'HTTPS/Localhost',
+                status: isHTTPS,
+                message: isHTTPS ? 'Running on secure connection' : '❌ PWA requires HTTPS (or localhost for testing)',
+                critical: true
+            });
+            addLog(`HTTPS Check: ${isHTTPS ? 'PASS' : 'FAIL'}`, isHTTPS ? 'success' : 'error');
+            
+            // Check 2: Service Worker Support
+            const hasSW = 'serviceWorker' in navigator;
+            checks.push({
+                name: 'Service Worker Support',
+                status: hasSW,
+                message: hasSW ? 'Browser supports Service Workers' : '❌ Browser does not support Service Workers',
+                critical: true
+            });
+            addLog(`Service Worker Support: ${hasSW ? 'PASS' : 'FAIL'}`, hasSW ? 'success' : 'error');
+            
+            // Check 3: Manifest
+            let manifestOk = false;
+            try {
+                const response = await fetch('/admin-manifest.json');
+                if (response.ok) {
+                    const manifest = await response.json();
+                    manifestOk = manifest.name && manifest.icons && manifest.icons.length > 0;
+                    checks.push({
+                        name: 'Manifest File',
+                        status: manifestOk,
+                        message: manifestOk ? 'Manifest found and valid' : '⚠️ Manifest missing name or icons',
+                        critical: true
+                    });
+                    addLog(`Manifest: ${manifestOk ? 'PASS' : 'FAIL'}`, manifestOk ? 'success' : 'warning');
+                } else {
+                    checks.push({
+                        name: 'Manifest File',
+                        status: false,
+                        message: `❌ Manifest not found (${response.status})`,
+                        critical: true
+                    });
+                    addLog('Manifest: NOT FOUND', 'error');
+                }
+            } catch (error) {
+                checks.push({
+                    name: 'Manifest File',
+                    status: false,
+                    message: `❌ Error loading manifest: ${error.message}`,
+                    critical: true
+                });
+                addLog(`Manifest Error: ${error.message}`, 'error');
+            }
+            
+            // Check 4: Service Worker Registration
+            let swRegistered = false;
+            if (hasSW) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    swRegistered = registrations.length > 0;
+                    checks.push({
+                        name: 'Service Worker Registered',
+                        status: swRegistered,
+                        message: swRegistered ? `✅ ${registrations.length} service worker(s) registered` : '⚠️ No service worker registered yet',
+                        critical: true
+                    });
+                    addLog(`Service Worker Registered: ${swRegistered ? 'YES' : 'NO'}`, swRegistered ? 'success' : 'warning');
+                } catch (error) {
+                    addLog(`Service Worker Check Error: ${error.message}`, 'error');
+                }
+            }
+            
+            // Check 5: Install Prompt
+            const hasInstallPrompt = window.deferredPrompt !== undefined && window.deferredPrompt !== null;
+            checks.push({
+                name: 'Install Prompt Available',
+                status: hasInstallPrompt,
+                message: hasInstallPrompt ? '✅ Install prompt is available' : '⚠️ Install prompt not triggered yet',
+                critical: false
+            });
+            addLog(`Install Prompt: ${hasInstallPrompt ? 'AVAILABLE' : 'NOT AVAILABLE'}`, hasInstallPrompt ? 'success' : 'warning');
+            
+            // Check 6: Already Installed
+            const isInstalled = window.matchMedia('(display-mode: standalone)').matches || 
+                              window.navigator.standalone === true;
+            checks.push({
+                name: 'App Installation Status',
+                status: isInstalled,
+                message: isInstalled ? '✅ App is already installed' : 'Not installed yet',
+                critical: false
+            });
+            addLog(`Installation Status: ${isInstalled ? 'INSTALLED' : 'NOT INSTALLED'}`, 'info');
+            
+            // Check 7: Icons availability
+            let iconsOk = false;
+            try {
+                const icon192 = await fetch('J _ A192.png');
+                const icon512 = await fetch('J _ A512.png');
+                iconsOk = icon192.ok && icon512.ok;
+                checks.push({
+                    name: 'App Icons',
+                    status: iconsOk,
+                    message: iconsOk ? '✅ Required icons found' : '❌ Missing required icons (192x192 and 512x512)',
+                    critical: true
+                });
+                addLog(`Icons Check: ${iconsOk ? 'PASS' : 'FAIL'}`, iconsOk ? 'success' : 'error');
+            } catch (error) {
+                checks.push({
+                    name: 'App Icons',
+                    status: false,
+                    message: '❌ Error checking icons',
+                    critical: true
+                });
+                addLog(`Icons Error: ${error.message}`, 'error');
+            }
+            
+            displayChecks(checks);
+            displayRequirements();
+            displayFixes(checks);
+        }
+        
+        function displayChecks(checks) {
+            const container = document.getElementById('status-checks');
+            const mainStatus = document.getElementById('main-status');
+            
+            const criticalFails = checks.filter(c => c.critical && !c.status).length;
+            
+            if (criticalFails === 0) {
+                mainStatus.classList.add('success');
+            } else {
+                mainStatus.classList.add('error');
+            }
+            
+            container.innerHTML = checks.map(check => `
+                <div class="status-item ${check.status ? 'success' : (check.critical ? 'error' : 'warning')}">
+                    <span class="status-icon">${check.status ? '✅' : (check.critical ? '❌' : '⚠️')}</span>
+                    <div>
+                        <strong>${check.name}</strong><br>
+                        <span style="font-size: 14px; opacity: 0.9;">${check.message}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        function displayRequirements() {
+            const container = document.getElementById('requirements');
+            container.innerHTML = `
+                <div class="code-block">
+                    <strong>1. Manifest File Location:</strong><br>
+                    File: <code>/manifest.json</code> (root directory)<br>
+                    Status: <span id="manifest-location">Checking...</span>
+                </div>
+                
+                <div class="code-block">
+                    <strong>2. Service Worker Location:</strong><br>
+                    File: <code>/sw.js</code> (root directory)<br>
+                    Status: <span id="sw-location">Checking...</span>
+                </div>
+                
+                <div class="code-block">
+                    <strong>3. Required Icons:</strong><br>
+                    • /icons/icon-192x192.png<br>
+                    • /icons/icon-512x512.png<br>
+                    Status: <span id="icons-location">Checking...</span>
+                </div>
+                
+                <div class="code-block">
+                    <strong>4. HTML Meta Tags Required:</strong>
+                    <pre>&lt;link rel="manifest" href="/manifest.json"&gt;
+&lt;meta name="theme-color" content="#5b53f2"&gt;</pre>
+                </div>
+            `;
+            
+            // Check files
+            fetch('/manifest.json').then(r => {
+                document.getElementById('manifest-location').innerHTML = 
+                    r.ok ? '✅ Found' : '❌ Not Found';
+            });
+            
+            fetch('/sw.js').then(r => {
+                document.getElementById('sw-location').innerHTML = 
+                    r.ok ? '✅ Found' : '❌ Not Found';
+            });
+            
+            Promise.all([
+                fetch('/icons/icon-192x192.png'),
+                fetch('/icons/icon-512x512.png')
+            ]).then(([r1, r2]) => {
+                document.getElementById('icons-location').innerHTML = 
+                    (r1.ok && r2.ok) ? '✅ Both Found' : '❌ Missing';
+            });
+        }
+        
+        function displayFixes(checks) {
+            const container = document.getElementById('fixes');
+            let fixes = [];
+            
+            const failedChecks = checks.filter(c => !c.status && c.critical);
+            
+            if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+                fixes.push({
+                    issue: '🔒 Not running on HTTPS',
+                    solution: `
+                        <strong>Solutions:</strong><br>
+                        • For local testing: Use <code>localhost</code> or <code>127.0.0.1</code><br>
+                        • For production: Deploy to a hosting with HTTPS (Netlify, Vercel, Firebase Hosting)<br>
+                        • Use ngrok for testing: <code>ngrok http 8000</code>
+                    `
+                });
+            }
+            
+            if (!checks.find(c => c.name === 'Manifest File')?.status) {
+                fixes.push({
+                    issue: '📄 Manifest file missing or invalid',
+                    solution: `
+                        <strong>Fix:</strong><br>
+                        1. Create <code>manifest.json</code> in your root directory<br>
+                        2. Add to your HTML: <code>&lt;link rel="manifest" href="/manifest.json"&gt;</code><br>
+                        3. Verify it loads: <a href="/manifest.json" target="_blank">Click to check</a>
+                    `
+                });
+            }
+            
+            if (!checks.find(c => c.name === 'App Icons')?.status) {
+                fixes.push({
+                    issue: '🎨 App icons missing',
+                    solution: `
+                        <strong>Fix:</strong><br>
+                        1. Create an <code>/icons/</code> folder in your root directory<br>
+                        2. Add these files:<br>
+                        • icon-192x192.png<br>
+                        • icon-512x512.png<br>
+                        3. Use <a href="https://realfavicongenerator.net" target="_blank">RealFaviconGenerator</a> to create them
+                    `
+                });
+            }
+            
+            if (!checks.find(c => c.name === 'Service Worker Registered')?.status) {
+                fixes.push({
+                    issue: '⚙️ Service Worker not registered',
+                    solution: `
+                        <strong>Fix:</strong><br>
+                        1. Create <code>sw.js</code> in root directory<br>
+                        2. Add registration code to your HTML:<br>
+                        <pre>if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js');
+}</pre>
+                        3. Reload the page
+                    `
+                });
+            }
+            
+            if (fixes.length === 0) {
+                container.innerHTML = `
+                    <div class="status-item success">
+                        <span class="status-icon">🎉</span>
+                        <div>
+                            <strong>All checks passed!</strong><br>
+                            If install prompt still doesn't show:<br>
+                            • Clear browser cache (Ctrl+Shift+Delete)<br>
+                            • Wait 1-2 minutes after visiting the site<br>
+                            • On mobile: Use Chrome menu → "Install app"<br>
+                            • On desktop: Look for install icon in address bar
+                        </div>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = fixes.map(fix => `
+                    <div class="code-block">
+                        <strong>${fix.issue}</strong><br>
+                        ${fix.solution}
+                    </div>
+                `).join('');
+            }
+        }
+        
+        // Test functions
+        async function testManifest() {
+            addLog('Testing manifest...', 'info');
+            try {
+                const response = await fetch('/manifest.json');
+                if (response.ok) {
+                    const manifest = await response.json();
+                    addLog('Manifest loaded successfully', 'success');
+                    addLog(JSON.stringify(manifest, null, 2), 'info');
+                } else {
+                    addLog(`Manifest failed to load: ${response.status}`, 'error');
+                }
+            } catch (error) {
+                addLog(`Manifest error: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testServiceWorker() {
+            addLog('Testing service worker...', 'info');
+            if ('serviceWorker' in navigator) {
+                try {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    addLog(`Found ${registrations.length} service worker(s)`, 'success');
+                    registrations.forEach((reg, i) => {
+                        addLog(`SW ${i + 1}: ${reg.active ? 'Active' : 'Inactive'} - Scope: ${reg.scope}`, 'info');
+                    });
+                } catch (error) {
+                    addLog(`Service worker error: ${error.message}`, 'error');
+                }
+            } else {
+                addLog('Service workers not supported', 'error');
+            }
+        }
+        
+        function testHTTPS() {
+            addLog('Testing HTTPS...', 'info');
+            const isSecure = location.protocol === 'https:' || 
+                           location.hostname === 'localhost' || 
+                           location.hostname === '127.0.0.1';
+            addLog(`Protocol: ${location.protocol}`, 'info');
+            addLog(`Hostname: ${location.hostname}`, 'info');
+            addLog(`Secure context: ${isSecure ? 'YES' : 'NO'}`, isSecure ? 'success' : 'error');
+        }
+        
+        function forceInstallPrompt() {
+            addLog('Attempting to show install prompt...', 'info');
+            if (window.deferredPrompt) {
+                window.deferredPrompt.prompt();
+                addLog('Install prompt triggered', 'success');
+            } else {
+                addLog('Install prompt not available. This can happen if:', 'warning');
+                addLog('1. App is already installed', 'warning');
+                addLog('2. Not enough engagement (visit site multiple times)', 'warning');
+                addLog('3. Site doesn\'t meet PWA criteria', 'warning');
+                addLog('4. Browser doesn\'t support install prompt', 'warning');
+            }
+        }
+        
+        async function clearAll() {
+            addLog('Clearing all cache and service workers...', 'info');
+            try {
+                // Unregister all service workers
+                if ('serviceWorker' in navigator) {
+                    const registrations = await navigator.serviceWorker.getRegistrations();
+                    for (let registration of registrations) {
+                        await registration.unregister();
+                        addLog('Service worker unregistered', 'success');
+                    }
+                }
+                
+                // Clear caches
+                const cacheNames = await caches.keys();
+                for (let cacheName of cacheNames) {
+                    await caches.delete(cacheName);
+                    addLog(`Cache deleted: ${cacheName}`, 'success');
+                }
+                
+                addLog('All cleared! Reload the page.', 'success');
+                setTimeout(() => location.reload(), 2000);
+            } catch (error) {
+                addLog(`Error clearing: ${error.message}`, 'error');
+            }
+        }
+        
+        // Run checks on load
+        runAllChecks();
+        
+        // Capture install prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            window.deferredPrompt = e;
+            addLog('✅ Install prompt captured!', 'success');
+            runAllChecks();
+        });
+        
+        // Listen for app installed
+        window.addEventListener('appinstalled', () => {
+            addLog('🎉 App installed successfully!', 'success');
+            runAllChecks();
+        });
+    </script>
+</body>
+</html>
