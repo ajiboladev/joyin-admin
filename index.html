@@ -6,12 +6,32 @@
     <title>Loading - JOYIN Admin</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-   <!-- PWA Meta Tags -->
-    <link rel="manifest" href="/admin-manifest.json">
-    <meta name="theme-color" content="#5b53f2">
+     <!-- PWA Meta Tags -->
+    <meta name="application-name" content="JOYIN Admin">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="JOYIN Admin">
+    <meta name="apple-mobile-web-app-title" content="JOYIN">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#5b53f2">
+    <meta name="msapplication-TileColor" content="#5b53f2">
+    <meta name="msapplication-navbutton-color" content="#5b53f2">
+    
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/admin-manifest.json">
+
+
+
+
+    <!-- Web App Manifest -->
+<link rel="manifest" href="/admin-manifest.json">
+<meta name="theme-color" content="#5b53f2">
+<meta name="apple-mobile-web-app-capable" content="yes">
+
+
+<link rel="manifest" href="/admin-manifest.json">
+<meta name="theme-color" content="#5b53f2">
+<script src="/pwa-install.js"></script>
     <style>
         * {
             margin: 0;
@@ -464,154 +484,24 @@
                 </svg>
                 App installed successfully!
             </div>
-<script>
-    // ============================================
-        // PWA INSTALL FUNCTIONALITY
-        // ============================================
-        let deferredPrompt;
-        const installContainer = document.getElementById('installContainer');
-        const installBtn = document.getElementById('installBtn');
-        const installSuccess = document.getElementById('installSuccess');
 
-        // Check if already installed
-        function isAppInstalled() {
-            return window.matchMedia('(display-mode: standalone)').matches ||
-                   window.navigator.standalone === true ||
-                   localStorage.getItem('joyin-admin-installed') === 'true';
-        }
-
-        // Show install button if conditions are met
-        function showInstallButton() {
-            if (!isAppInstalled()) {
-                installContainer.style.display = 'block';
-            } else {
-                console.log('App already installed');
-                showInstalledMessage();
-            }
-        }
-
-        // Capture install prompt
-        window.addEventListener('beforeinstallprompt', (e) => {
-            console.log('Install prompt captured');
-            e.preventDefault();
-            deferredPrompt = e;
-            showInstallButton();
-        });
-
-        // Handle install button click
-        installBtn.addEventListener('click', async () => {
-            if (!deferredPrompt) {
-                console.log('Install prompt not available');
-                alert('Install option not available. Try accessing from Chrome or Edge browser.');
-                return;
-            }
-
-            console.log('Showing install prompt');
-            
-            // Show loading state
-            installBtn.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                </svg>
-                Installing...
-            `;
-            installBtn.disabled = true;
-
-            deferredPrompt.prompt();
-
-            const { outcome } = await deferredPrompt.userChoice;
-            console.log('Install outcome:', outcome);
-
-            if (outcome === 'accepted') {
-                console.log('User accepted install');
-                localStorage.setItem('joyin-admin-installed', 'true');
-                hideInstallButton();
-                showInstalledMessage();
-            } else {
-                console.log('User dismissed install');
-                // Restore button
-                installBtn.innerHTML = `
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                        <polyline points="7 10 12 15 17 10"/>
-                        <line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Install Admin App
-                `;
-                installBtn.disabled = false;
-            }
-
-            deferredPrompt = null;
-        });
-
-        // App installed event
-        window.addEventListener('appinstalled', () => {
-            console.log('App installed successfully');
-            localStorage.setItem('joyin-admin-installed', 'true');
-            hideInstallButton();
-            showInstalledMessage();
-        });
-
-        // Hide install button
-        function hideInstallButton() {
-            installContainer.style.display = 'none';
-        }
-
-        // Show installed message
-        function showInstalledMessage() {
-            installSuccess.style.display = 'flex';
-            setTimeout(() => {
-                installSuccess.style.display = 'none';
-            }, 5000);
-        }
-
-        // Check on page load
-        window.addEventListener('load', () => {
-            if (isAppInstalled()) {
-                console.log('Running as installed app');
-                hideInstallButton();
-            }
-        });
-
-        // ============================================
-        // LOGIN FUNCTIONALITY
-        // ============================================
-        const loginForm = document.getElementById('loginForm');
-
-        loginForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-
-            // Demo login (replace with your actual authentication)
-            if (username === 'admin' && password === 'admin123') {
-                alert('Login successful! Redirecting to dashboard...');
-                // Redirect to admin dashboard
-                window.location.href = '/admin/dashboard/';
-            } else {
-                alert('Invalid credentials. Please try again.');
-            }
-        });
-
-        // ============================================
-        // SERVICE WORKER REGISTRATION
-        // ============================================
+            <!-- PWA Installation Script -->
+    <script src="/pwa-install.js"></script>
+    
+    <!-- Register Service Worker -->
+    <script>
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('/admin-sw.js')
                     .then(registration => {
-                        console.log('Admin SW registered:', registration.scope);
+                        console.log('✅ Service Worker registered:', registration.scope);
                     })
                     .catch(error => {
-                        console.error('Admin SW registration failed:', error);
+                        console.error('❌ Service Worker registration failed:', error);
                     });
             });
         }
-
-        console.log('JOYIN Admin PWA loaded');
     </script>
-</script>
 
 
     <script>
