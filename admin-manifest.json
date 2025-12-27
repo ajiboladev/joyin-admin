@@ -1,6 +1,6 @@
 {
   "name": "Joyin Admin",
-  "short_name": "Jyin Adimn",
+  "short_name": "Joyin Admin",
   "version": "1.0.0",
   "description": "The social app that's always fresh",
   "start_url": "/?source=pwa",
@@ -11,15 +11,15 @@
   "scope": "/",
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%235b53f2' width='192' height='192' rx='40'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='100' font-weight='900' fill='white'%3EJ%3C/text%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='20' fill='white' opacity='0.9'%3EADMIN%3C/text%3E%3C/svg%3E",
+      "src": "J _ A192.png",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'%3E%3Crect fill='%235b53f2' width='192' height='192' rx='40'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial Black' font-size='100' font-weight='900' fill='white'%3EJ%3C/text%3E%3Ctext x='50%25' y='65%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='20' fill='white' opacity='0.9'%3EADMIN%3C/text%3E%3C/svg%3E",
+      "src": "J _ A512.png",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ]

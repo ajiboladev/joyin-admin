@@ -47,7 +47,17 @@ function showInstallButton() {
   
   // Check if button already exists
   installButton = document.getElementById('pwa-install-button');
-  
+
+  // Prefer page-provided install button (id="installBtn") if present
+  const pageBtn = document.getElementById('installBtn');
+  if (pageBtn) {
+    installButton = pageBtn;
+    installButton.id = installButton.id || 'installBtn';
+    installButton.addEventListener('click', handleInstallClick);
+    const container = document.getElementById('installContainer');
+    if (container) container.style.display = '';
+  }
+
   if (!installButton) {
     // Create install button
     installButton = document.createElement('button');
@@ -104,7 +114,11 @@ function showInstallButton() {
 // HIDE INSTALL BUTTON PERMANENTLY
 // ============================================
 function hideInstallButton() {
-  if (installButton) {
+  // Hide page container if present
+  const container = document.getElementById('installContainer');
+  if (container) container.style.display = 'none';
+
+  if (installButton && installButton.id === 'pwa-install-button') {
     installButton.style.animation = 'slideOutDown 0.5s ease';
     setTimeout(() => {
       installButton.remove();
@@ -123,8 +137,10 @@ async function handleInstallClick() {
   }
   
   // Hide the button temporarily
-  installButton.style.opacity = '0.5';
-  installButton.style.pointerEvents = 'none';
+  if (installButton) {
+    installButton.style.opacity = '0.5';
+    installButton.style.pointerEvents = 'none';
+  }
   
   // Show the install prompt
   deferredPrompt.prompt();
@@ -136,12 +152,20 @@ async function handleInstallClick() {
   if (outcome === 'accepted') {
     console.log('✅ [PWA] User accepted the install');
     hideInstallButton(); // Remove button permanently
-    showInstallSuccessMessage();
+    // show the existing success element if present
+    const successEl = document.getElementById('installSuccess');
+    if (successEl) {
+      successEl.style.display = '';
+    } else {
+      showInstallSuccessMessage();
+    }
   } else {
     console.log('❌ [PWA] User dismissed the install');
     // Restore button
-    installButton.style.opacity = '1';
-    installButton.style.pointerEvents = 'auto';
+    if (installButton) {
+      installButton.style.opacity = '1';
+      installButton.style.pointerEvents = 'auto';
+    }
   }
   
   // Clear the prompt
@@ -197,6 +221,14 @@ window.addEventListener('load', () => {
 // SHOW SUCCESS MESSAGE
 // ============================================
 function showInstallSuccessMessage() {
+  // If page includes a success element, show that instead
+  const pageSuccess = document.getElementById('installSuccess');
+  if (pageSuccess) {
+    pageSuccess.style.display = '';
+    setTimeout(() => { pageSuccess.style.display = 'none'; }, 5000);
+    return;
+  }
+
   const successMessage = document.createElement('div');
   successMessage.innerHTML = `
     <div style="display: flex; align-items: center; gap: 12px;">
