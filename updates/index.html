@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | JOYIN</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="../J _ A192.png">
+</head>
+<body>
+    <header class="admin-header">
+        <h1 class="admin-title">JOYIN Admin</h1>
+        <nav class="admin-nav">
+             <button onclick="history.back()" style="
+    background: rgb(68, 29, 68);
+    color: var(--primary);
+    border: 2px solid var(--primary);
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+">
+    <i class="fas fa-arrow-left"></i>
+    <span>Back</span>
+</button>
+            <a href="send-update.html" class="nav-btn">📢 Send Update</a>
+            <a href="manage-updates.html" class="nav-btn">📋 Manage Updates</a>
+            <button class="nav-btn" id="logout-btn">🚪 Logout</button>
+        </nav>
+    </header>
+
+    <main class="dashboard">
+        <h2>Dashboard</h2>
+        
+        <div class="dashboard-grid">
+            <div class="stats-card">
+                <div class="stats-title">Total Updates</div>
+                <div class="stats-number" id="total-updates">0</div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-title">What's New</div>
+                <div class="stats-number" id="whats-new-count">0</div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-title">Notices</div>
+                <div class="stats-number" id="notices-count">0</div>
+            </div>
+            
+            <div class="stats-card">
+                <div class="stats-title">Active Now</div>
+                <div class="stats-number" id="active-updates">0</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Load script as module -->
+    <script type="module">
+        import { loadDashboardStats } from './script.js';
+        
+        // Load stats when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log("Admin dashboard loading...");
+            loadDashboardStats();
+        });
+        
+        // Logout button
+        document.getElementById('logout-btn').addEventListener('click', function() {
+            // Add your logout logic here
+            window.location.href = '../index.html';
+        });
+    </script>
+</body>
+</html>

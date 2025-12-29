@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Updates | JOYIN Admin</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="icon" href="../J _ A192.png">
+</head>
+<body>
+    <header class="admin-header">
+        <h1 class="admin-title">Manage Updates</h1>
+        <nav class="admin-nav">
+            <button onclick="history.back()" style="
+    background: rgb(68, 29, 68);
+    color: var(--primary);
+    border: 2px solid var(--primary);
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-size: 16px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+">
+    <i class="fas fa-arrow-left"></i>
+    <span>Back</span>
+</button>
+            <a href="index.html" class="nav-btn">← Dashboard</a>
+            <a href="send-update.html" class="nav-btn">+ New Update</a>
+        </nav>
+    </header>
+
+    <main class="dashboard">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+            <h2>All Updates</h2>
+            <button class="nav-btn" id="refresh-btn">🔄 Refresh</button>
+        </div>
+        
+        <div class="updates-list-admin" id="updates-list">
+            <div class="loading-state">Loading updates...</div>
+        </div>
+    </main>
+
+    <!-- Load script -->
+    <script type="module" src="script.js"></script>
+    
+    <script>
+    // When page loads
+    document.addEventListener('DOMContentLoaded', function() {
+        // Load updates - FIX THIS LINE:
+        if (window.getAllUpdates) {
+            // You need to call loadAllUpdates, not getAllUpdates
+            // But loadAllUpdates might not exist, so let's fix it properly:
+            loadUpdatesList();
+        }
+        
+        // Setup refresh button
+        document.getElementById('refresh-btn').addEventListener('click', function() {
+            loadUpdatesList(); // Refresh the list
+        });
+    });
+    
+    // Add this function to actually display the updates
+    async function loadUpdatesList() {
+        const container = document.getElementById('updates-list');
+        if (!container) return;
+        
+        container.innerHTML = '<div class="loading-state">Loading updates...</div>';
+        
+        // Call getAllUpdates to get the data
+        const updates = await getAllUpdates();
+        
+        if (updates.length === 0) {
+            container.innerHTML = '<div class="empty-state">No updates found.</div>';
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        updates.forEach(update => {
+            const item = document.createElement('div');
+            item.className = 'update-item';
+            
+            const icon = update.type === 'whats_new' ? '🎉' : '📢';
+            const typeText = update.type === 'whats_new' ? "What's New" : "Notice";
+            const date = formatDate(update.createdAt);
+            const status = update.isActive ? '✅ Active' : '❌ Inactive';
+            
+            item.innerHTML = `
+                <div class="update-info">
+                    <h3>${icon} ${update.title}</h3>
+                    <div class="update-meta">
+                        ${typeText} • ${date} • ${status} • 
+                        ${update.priority === 'important' ? '🔴 Important' : '⚪ Normal'}
+                    </div>
+                    <p style="color: var(--text-secondary); font-size: 14px; margin-top: 5px;">
+                        ${update.preview}
+                    </p>
+                </div>
+                <div class="update-actions">
+                    <button class="action-btn toggle-btn" onclick="toggleStatus('${update.id}', ${update.isActive})">
+                        ${update.isActive ? 'Hide' : 'Show'}
+                    </button>
+                    <button class="action-btn edit-btn" onclick="editUpdate('${update.id}')">
+                        Edit
+                    </button>
+                    <button class="action-btn delete-btn" onclick="deleteUpdatePrompt('${update.id}')">
+                        Delete
+                    </button>
+                </div>
+            `;
+            
+            container.appendChild(item);
+        });
+    }
+    
+    // Helper functions for buttons
+    async function toggleStatus(updateId, currentStatus) {
+        const result = await toggleUpdateStatus(updateId, currentStatus);
+        if (result.success) {
+            loadUpdatesList(); // Refresh
+        } else {
+            alert('Failed: ' + result.error);
+        }
+    }
+    
+    async function deleteUpdatePrompt(updateId) {
+        const result = await deleteUpdate(updateId);
+        if (result.success) {
+            loadUpdatesList(); // Refresh
+        } else if (result.error !== "Cancelled") {
+            alert('Failed: ' + result.error);
+        }
+    }
+    
+    function editUpdate(updateId) {
+        alert('Edit coming soon! ID: ' + updateId);
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,286 @@
+/* admin/style.css - Admin panel styles */
+:root {
+  --joyin-purple: #5b53f2;
+  --background: #000000;
+  --card-bg: #111111;
+  --text-primary: #ffffff;
+  --text-secondary: #a0a0a0;
+  --border: #333333;
+  --success: #2ed573;
+  --warning: #ffa502;
+  --error: #ff4757;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  background: var(--background);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+}
+
+/* Admin Header */
+.admin-header {
+  background: var(--card-bg);
+  padding: 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.admin-title {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.admin-nav {
+  display: flex;
+  gap: 15px;
+}
+
+.nav-btn {
+  padding: 10px 20px;
+  background: rgba(91, 83, 242, 0.1);
+  border: 1px solid var(--joyin-purple);
+  color: var(--joyin-purple);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.nav-btn:hover {
+  background: rgba(91, 83, 242, 0.2);
+}
+
+/* Dashboard */
+.dashboard {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 30px 20px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+  margin-top: 30px;
+}
+
+.stats-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 25px;
+  border: 1px solid var(--border);
+}
+
+.stats-title {
+  font-size: 18px;
+  color: var(--text-secondary);
+  margin-bottom: 15px;
+}
+
+.stats-number {
+  font-size: 36px;
+  font-weight: 700;
+  color: var(--joyin-purple);
+}
+
+/* Form Styles */
+.form-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 30px;
+  border: 1px solid var(--border);
+  max-width: 800px;
+  margin: 30px auto;
+}
+
+.form-title {
+  font-size: 24px;
+  margin-bottom: 25px;
+  text-align: center;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.form-input,
+.form-textarea,
+.form-select {
+  width: 100%;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 16px;
+}
+
+.form-textarea {
+  min-height: 200px;
+  resize: vertical;
+}
+
+.form-select {
+  cursor: pointer;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.form-buttons {
+  display: flex;
+  gap: 15px;
+  margin-top: 30px;
+}
+
+.btn-primary {
+  flex: 1;
+  padding: 16px;
+  background: var(--joyin-purple);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-secondary {
+  flex: 1;
+  padding: 16px;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-primary:hover {
+  background: var(--joyin-purple-light);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Updates List */
+.updates-list-admin {
+  margin-top: 20px;
+}
+
+.update-item {
+  background: var(--card-bg);
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 15px;
+  border: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.update-info h3 {
+  font-size: 18px;
+  margin-bottom: 5px;
+}
+
+.update-meta {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.update-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.action-btn {
+  padding: 8px 15px;
+  border-radius: 6px;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.edit-btn {
+  background: rgba(46, 213, 115, 0.1);
+  color: var(--success);
+}
+
+.delete-btn {
+  background: rgba(255, 71, 87, 0.1);
+  color: var(--error);
+}
+
+.toggle-btn {
+  background: rgba(91, 83, 242, 0.1);
+  color: var(--joyin-purple);
+}
+
+/* Preview */
+.preview-card {
+  background: var(--card-bg);
+  border-radius: 12px;
+  padding: 25px;
+  margin-top: 30px;
+  border: 1px solid var(--border);
+}
+
+.preview-title {
+  font-size: 20px;
+  margin-bottom: 15px;
+  color: var(--text-secondary);
+}
+
+.preview-content {
+  background: rgba(255, 255, 255, 0.02);
+  padding: 20px;
+  border-radius: 8px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .dashboard {
+    padding: 20px 15px;
+  }
+  
+  .form-card {
+    padding: 20px;
+    margin: 20px;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .update-item {
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+  }
+  
+  .update-actions {
+    width: 100%;
+    justify-content: center;
+  }
+}
