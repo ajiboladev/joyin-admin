@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JOYIN - Video Posts Admin</title>
+    <link rel="stylesheet" href="admin-video.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+     <link rel="icon" href="../J _ A192.png">
+
+    <link rel="manifest" href="../admin-manifest.json">
+<meta name="theme-color" content="#5b53f2">
+<script src="../admin-pwa-install.js"></script>
+</head>
+<body>
+    <!-- TOP NAVIGATION -->
+    <header class="top-nav">
+        <div class="nav-left">
+            <button class="nav-btn" id="backBtn">
+                <i class="fas fa-arrow-left"></i>
+            </button>
+            <h1 class="nav-title">Video Posts Admin</h1>
+        </div>
+        <button class="refresh-btn" id="refreshBtn">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+        </button>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <div class="admin-container">
+        
+        <!-- STATISTICS CARDS -->
+        <div class="stats-grid">
+            <!-- Total Videos -->
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(91, 83, 242, 0.2);">
+                    <i class="fas fa-video" style="color: #5b53f2;"></i>
+                </div>
+                <div class="stat-info">
+                    <p class="stat-label">Total Videos</p>
+                    <p class="stat-value" id="totalVideos">0</p>
+                </div>
+            </div>
+
+            <!-- Today's Videos -->
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(46, 213, 115, 0.2);">
+                    <i class="fas fa-calendar-day" style="color: #2ed573;"></i>
+                </div>
+                <div class="stat-info">
+                    <p class="stat-label">Today's Videos</p>
+                    <p class="stat-value" id="todayVideos">0</p>
+                </div>
+            </div>
+
+            <!-- This Week -->
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(255, 159, 67, 0.2);">
+                    <i class="fas fa-calendar-week" style="color: #ff9f43;"></i>
+                </div>
+                <div class="stat-info">
+                    <p class="stat-label">This Week</p>
+                    <p class="stat-value" id="weekVideos">0</p>
+                </div>
+            </div>
+
+            <!-- Total Storage Used -->
+            <div class="stat-card">
+                <div class="stat-icon" style="background: rgba(238, 82, 83, 0.2);">
+                    <i class="fas fa-database" style="color: #ee5253;"></i>
+                </div>
+                <div class="stat-info">
+                    <p class="stat-label">Storage Used</p>
+                    <p class="stat-value" id="storageUsed">0 MB</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- FILTERS & SEARCH -->
+        <div class="filters-section">
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search by username or video ID...">
+            </div>
+            
+            <div class="filter-buttons">
+                <button class="filter-btn active" data-filter="all">
+                    All Videos
+                </button>
+                <button class="filter-btn" data-filter="today">
+                    Today
+                </button>
+                <button class="filter-btn" data-filter="week">
+                    This Week
+                </button>
+            </div>
+        </div>
+
+        <!-- LOADING INDICATOR -->
+        <div class="loading-container" id="loadingContainer">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Loading videos...</p>
+        </div>
+
+        <!-- VIDEO LIST -->
+        <div class="video-list" id="videoList">
+            <!-- Videos will be loaded here dynamically -->
+        </div>
+
+        <!-- NO VIDEOS MESSAGE -->
+        <div class="no-videos" id="noVideosMessage" style="display: none;">
+            <i class="fas fa-video-slash"></i>
+            <p>No videos found</p>
+        </div>
+
+    </div>
+
+    <!-- VIDEO PREVIEW MODAL -->
+    <div class="modal" id="previewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Video Preview</h3>
+                <button class="close-btn" id="closeModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <video id="modalVideo" controls playsinline></video>
+                
+                <div class="video-details">
+                    <div class="detail-row">
+                        <span class="detail-label">Posted by:</span>
+                        <span class="detail-value" id="modalUsername">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Video ID:</span>
+                        <span class="detail-value" id="modalVideoId">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Upload Date:</span>
+                        <span class="detail-value" id="modalDate">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Duration:</span>
+                        <span class="detail-value" id="modalDuration">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">File Size:</span>
+                        <span class="detail-value" id="modalSize">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Likes:</span>
+                        <span class="detail-value" id="modalLikes">-</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Comments:</span>
+                        <span class="detail-value" id="modalComments">-</span>
+                    </div>
+                    <div class="detail-row caption-row" id="captionRow" style="display: none;">
+                        <span class="detail-label">Caption:</span>
+                        <span class="detail-value" id="modalCaption">-</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="modal-btn delete-btn" id="deleteVideoBtn">
+                    <i class="fas fa-trash"></i>
+                    Delete Video
+                </button>
+                <button class="modal-btn cancel-btn" id="cancelBtn">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DELETE CONFIRMATION MODAL -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content confirm-modal">
+            <div class="confirm-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <h3>Delete Video?</h3>
+            <p>This action cannot be undone. The video and all its data will be permanently deleted.</p>
+            
+            <div class="confirm-buttons">
+                <button class="confirm-delete-btn" id="confirmDeleteBtn">
+                    <i class="fas fa-trash"></i>
+                    Yes, Delete
+                </button>
+                <button class="confirm-cancel-btn" id="confirmCancelBtn">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase and Script -->
+    <script type="module" src="admin-video.js" defer></script>
+</body>
+</html>
