@@ -4,17 +4,19 @@ import { checkAdminAuth } from './auth.js';
 import { 
     doc, 
     deleteDoc,
-    getDoc 
+    getDoc,
+    updateDoc,
+    increment
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 import { 
     ref, 
     deleteObject 
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js";
 
-// Delete post (with image)
+// Delete post (with image and like count adjustment)
 export async function deletePost(postId) {
     try {
-        // First get the post to check for image
+        // First get the post to check for image and like count
         const postRef = doc(db, "posts", postId);
         const postSnap = await getDoc(postRef);
         
@@ -23,6 +25,22 @@ export async function deletePost(postId) {
         }
         
         const postData = postSnap.data();
+        const likeCount = postData.likeCount || 0;
+        const postOwnerId = postData.userId;
+        
+        // Update post owner's likesCount if the post had likes
+        if (likeCount > 0 && postOwnerId) {
+            try {
+                const userRef = doc(db, "users", postOwnerId);
+                await updateDoc(userRef, { 
+                    likesCount: increment(-likeCount) 
+                });
+                console.log(`✅ Decremented ${likeCount} likes from user ${postOwnerId}`);
+            } catch (userError) {
+                console.warn("Could not update user's like count:", userError);
+                // Continue with deletion even if user update fails
+            }
+        }
         
         // Delete image from storage if exists
         if (postData.imageUrl) {
@@ -40,7 +58,8 @@ export async function deletePost(postId) {
             }
         }
         
-        // Delete the post document
+        // Delete the post document (this will also delete subcollections like 'likes' if using client-side deletion)
+        // Note: Firestore doesn't automatically delete subcollections, you may need Cloud Functions for that
         await deleteDoc(postRef);
         
         return { success: true, message: `Post ${postId} deleted` };
@@ -77,3 +96,6 @@ export async function deleteMultiplePosts(postIds) {
     }
     return results;
 }
+
+
+// https://console.cloud.google.com/billing/01BDFD-69B718-989D39?authuser=1&organizationId=0(https://console.cloud.google.com/welcome?authuser=1&organizationId=0)
