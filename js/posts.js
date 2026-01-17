@@ -6,7 +6,13 @@ import {
     deleteDoc,
     getDoc,
     updateDoc,
-    increment
+    increment,
+    writeBatch, 
+    collection,
+    getDocs,
+    query,
+    limit,
+    startAfter
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 import { 
     ref, 
@@ -15,58 +21,90 @@ import {
 
 // Delete post (with image and like count adjustment)
 export async function deletePost(postId) {
-    try {
-        // First get the post to check for image and like count
-        const postRef = doc(db, "posts", postId);
-        const postSnap = await getDoc(postRef);
-        
-        if (!postSnap.exists()) {
-            return { success: false, error: "Post not found" };
-        }
-        
-        const postData = postSnap.data();
-        const likeCount = postData.likeCount || 0;
-        const postOwnerId = postData.userId;
-        
-        // Update post owner's likesCount if the post had likes
-        if (likeCount > 0 && postOwnerId) {
-            try {
-                const userRef = doc(db, "users", postOwnerId);
-                await updateDoc(userRef, { 
-                    likesCount: increment(-likeCount) 
-                });
-                console.log(`✅ Decremented ${likeCount} likes from user ${postOwnerId}`);
-            } catch (userError) {
-                console.warn("Could not update user's like count:", userError);
-                // Continue with deletion even if user update fails
-            }
-        }
-        
-        // Delete image from storage if exists
-        if (postData.imageUrl) {
-            try {
-                // Extract the path from the URL
-                const imagePath = decodeURIComponent(postData.imageUrl.split('/o/')[1]?.split('?')[0]);
-                if (imagePath) {
-                    const imageRef = ref(storage, imagePath);
-                    await deleteObject(imageRef);
-                    console.log(`✅ Image deleted: ${imagePath}`);
-                }
-            } catch (storageError) {
-                console.warn("Could not delete image:", storageError);
-                // Continue deleting post even if image fails
-            }
-        }
-        
-        // Delete the post document (this will also delete subcollections like 'likes' if using client-side deletion)
-        // Note: Firestore doesn't automatically delete subcollections, you may need Cloud Functions for that
-        await deleteDoc(postRef);
-        
-        return { success: true, message: `Post ${postId} deleted` };
-    } catch (error) {
-        return { success: false, error: error.message };
+  try {
+    const postRef = doc(db, "posts", postId);
+    const postSnap = await getDoc(postRef);
+
+    if (!postSnap.exists()) {
+      return { success: false, error: "Post not found" };
     }
+
+    const postData = postSnap.data();
+    const likeCount = postData.likeCount || 0;
+    const postOwnerId = postData.userId;
+
+    // 1️⃣ Prepare first batch
+    let batch = writeBatch(db);
+    let writes = 0;
+
+    // Update post owner's likesCount if needed
+    if (likeCount > 0 && postOwnerId) {
+      const userRef = doc(db, "users", postOwnerId);
+      batch.update(userRef, { likesCount: increment(-likeCount) });
+      writes++;
+    }
+
+    // Delete the post itself
+    batch.delete(postRef);
+    writes++;
+
+    // 2️⃣ Delete likes subcollection in batches
+    const likesRef = collection(db, "posts", postId, "likes");
+    let lastDoc = null;
+
+    while (true) {
+      let likesQuery = query(likesRef, limit(500 - writes));
+      if (lastDoc) likesQuery = query(likesRef, startAfter(lastDoc), limit(500 - writes));
+
+      const likesSnap = await getDocs(likesQuery);
+      if (likesSnap.empty) break;
+
+      likesSnap.forEach((likeDoc) => {
+        batch.delete(likeDoc.ref);
+        writes++;
+      });
+
+      lastDoc = likesSnap.docs[likesSnap.docs.length - 1];
+
+      // Commit current batch if we reach 500 writes
+      if (writes >= 500) {
+        await batch.commit();
+        batch = writeBatch(db);
+        writes = 0;
+      }
+    }
+
+    // Commit remaining batch
+    if (writes > 0) {
+      await batch.commit();
+    }
+
+    console.log(`✅ Post ${postId} and all likes deleted`);
+
+    // 3️⃣ Delete image from storage (cannot batch)
+    if (postData.imageUrl) {
+      try {
+        const imagePath = decodeURIComponent(postData.imageUrl.split("/o/")[1]?.split("?")[0]);
+        if (imagePath) {
+          const imageRef = ref(storage, imagePath);
+          await deleteObject(imageRef);
+          console.log(`✅ Image deleted: ${imagePath}`);
+        }
+      } catch (storageError) {
+        console.warn("Could not delete image from storage:", storageError);
+      }
+    }
+
+    return { success: true, message: `Post ${postId} deleted successfully` };
+
+  } catch (error) {
+    console.error("Error deleting post:", error);
+    return { success: false, error: error.message };
+  }
 }
+
+
+
 
 // Get post details
 export async function getPostDetails(postId) {
