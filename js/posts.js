@@ -19,7 +19,7 @@ import {
     deleteObject 
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js";
 
-// Delete post (with image and like count adjustment)
+// Delete post (with image, likes, and comments)
 export async function deletePost(postId) {
   try {
     const postRef = doc(db, "posts", postId);
@@ -31,6 +31,7 @@ export async function deletePost(postId) {
 
     const postData = postSnap.data();
     const likeCount = postData.likeCount || 0;
+    const commentCount = postData.commentCount || 0;
     const postOwnerId = postData.userId;
 
     // 1️⃣ Prepare first batch
@@ -50,11 +51,11 @@ export async function deletePost(postId) {
 
     // 2️⃣ Delete likes subcollection in batches
     const likesRef = collection(db, "posts", postId, "likes");
-    let lastDoc = null;
+    let lastLikeDoc = null;
 
     while (true) {
       let likesQuery = query(likesRef, limit(500 - writes));
-      if (lastDoc) likesQuery = query(likesRef, startAfter(lastDoc), limit(500 - writes));
+      if (lastLikeDoc) likesQuery = query(likesRef, startAfter(lastLikeDoc), limit(500 - writes));
 
       const likesSnap = await getDocs(likesQuery);
       if (likesSnap.empty) break;
@@ -64,7 +65,7 @@ export async function deletePost(postId) {
         writes++;
       });
 
-      lastDoc = likesSnap.docs[likesSnap.docs.length - 1];
+      lastLikeDoc = likesSnap.docs[likesSnap.docs.length - 1];
 
       // Commit current batch if we reach 500 writes
       if (writes >= 500) {
@@ -74,14 +75,69 @@ export async function deletePost(postId) {
       }
     }
 
+    console.log(`✅ Deleted ${likeCount} likes for post ${postId}`);
+
+    // 3️⃣ Delete comments subcollection in batches
+    const commentsRef = collection(db, "posts", postId, "comments");
+    let lastCommentDoc = null;
+    const commentUserIds = new Map(); // Track comment count per user
+
+    while (true) {
+      let commentsQuery = query(commentsRef, limit(500 - writes));
+      if (lastCommentDoc) commentsQuery = query(commentsRef, startAfter(lastCommentDoc), limit(500 - writes));
+
+      const commentsSnap = await getDocs(commentsQuery);
+      if (commentsSnap.empty) break;
+
+      commentsSnap.forEach((commentDoc) => {
+        const commentData = commentDoc.data();
+        const commenterId = commentData.userId;
+        
+        // Track how many comments each user made
+        if (commenterId) {
+          commentUserIds.set(commenterId, (commentUserIds.get(commenterId) || 0) + 1);
+        }
+        
+        batch.delete(commentDoc.ref);
+        writes++;
+      });
+
+      lastCommentDoc = commentsSnap.docs[commentsSnap.docs.length - 1];
+
+      // Commit current batch if we reach 500 writes
+      if (writes >= 500) {
+        await batch.commit();
+        batch = writeBatch(db);
+        writes = 0;
+      }
+    }
+
+    console.log(`✅ Deleted ${commentCount} comments for post ${postId}`);
+
+    // 4️⃣ Update comment counts for all commenters
+    for (const [userId, count] of commentUserIds) {
+      // Check if we need a new batch
+      if (writes >= 500) {
+        await batch.commit();
+        batch = writeBatch(db);
+        writes = 0;
+      }
+      
+      const userRef = doc(db, "users", userId);
+      batch.update(userRef, { commentsCount: increment(-count) });
+      writes++;
+    }
+
+    console.log(`✅ Updated comment counts for ${commentUserIds.size} users`);
+
     // Commit remaining batch
     if (writes > 0) {
       await batch.commit();
     }
 
-    console.log(`✅ Post ${postId} and all likes deleted`);
+    console.log(`✅ Post ${postId}, all likes, and all comments deleted`);
 
-    // 3️⃣ Delete image from storage (cannot batch)
+    // 5️⃣ Delete image from storage (cannot batch)
     if (postData.imageUrl) {
       try {
         const imagePath = decodeURIComponent(postData.imageUrl.split("/o/")[1]?.split("?")[0]);
@@ -95,16 +151,16 @@ export async function deletePost(postId) {
       }
     }
 
-    return { success: true, message: `Post ${postId} deleted successfully` };
+    return { 
+      success: true, 
+      message: `Post ${postId} deleted successfully (${likeCount} likes and ${commentCount} comments removed)` 
+    };
 
   } catch (error) {
     console.error("Error deleting post:", error);
     return { success: false, error: error.message };
   }
 }
-
-
-
 
 // Get post details
 export async function getPostDetails(postId) {
