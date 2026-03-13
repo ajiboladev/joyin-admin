@@ -1,116 +1,138 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Send Update | JOYIN Admin</title>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
     <header class="admin-header">
-        <h1 class="admin-title">Send Update</h1>
-        <nav class="admin-nav">
-            <a href="index.html" class="nav-btn">← Dashboard</a>
-            <a href="manage-updates.html" class="nav-btn">Manage Updates</a>
-        </nav>
+      <h1 class="admin-title">Send Update</h1>
+      <nav class="admin-nav">
+        <a href="index.html" class="nav-btn">← Dashboard</a>
+        <a href="manage-updates.html" class="nav-btn">Manage Updates</a>
+      </nav>
     </header>
 
     <main class="form-card">
-        <h2 class="form-title">Create New Update</h2>
-        
-        <form id="update-form">
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Update Type</label>
-                    <select class="form-select" id="type" required>
-                        <option value="">Select type</option>
-                        <option value="whats_new">🎉 What's New</option>
-                        <option value="notice">📢 Notice</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label class="form-label">Priority</label>
-                    <select class="form-select" id="priority" required>
-                        <option value="normal">Normal</option>
-                        <option value="important">Important (Shows red dot)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Title *</label>
-                <input type="text" class="form-input" id="title" 
-                       placeholder="New Feature Released!" 
-                       maxlength="100" required>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Short Preview *</label>
-                <textarea class="form-textarea" id="preview" 
-                          placeholder="Brief preview (max 140 characters)..." 
-                          maxlength="140" required></textarea>
-                <div style="text-align: right; font-size: 12px; color: var(--text-secondary);">
-                    <span id="preview-count">0</span>/140 characters
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label class="form-label">Full Content *</label>
-                <textarea class="form-textarea" id="content" 
-                          placeholder="Write full update here..." 
-                          required></textarea>
-            </div>
-            
-            <div class="form-buttons">
-                <button type="button" class="btn-secondary" onclick="previewUpdate()">
-                    Preview
-                </button>
-                <button type="submit" class="btn-primary" id="submit-btn">
-                    Publish Update
-                </button>
-            </div>
-        </form>
-        
-        <!-- Preview -->
-        <div class="preview-card" id="preview-section" style="display: none;">
-            <h3 class="preview-title">Preview</h3>
-            <div class="preview-content" id="preview-content">
-                Preview will appear here...
-            </div>
+      <h2 class="form-title">Create New Update</h2>
+
+      <form id="update-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Update Type</label>
+            <select class="form-select" id="type" required>
+              <option value="">Select type</option>
+              <option value="whats_new">🎉 What's New</option>
+              <option value="notice">📢 Notice</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Priority</label>
+            <select class="form-select" id="priority" required>
+              <option value="normal">Normal</option>
+              <option value="important">Important (Shows red dot)</option>
+            </select>
+          </div>
         </div>
+
+        <div class="form-group">
+          <label class="form-label">Title *</label>
+          <input
+            type="text"
+            class="form-input"
+            id="title"
+            placeholder="New Feature Released!"
+            maxlength="100"
+            required
+          />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Short Preview *</label>
+          <textarea
+            class="form-textarea"
+            id="preview"
+            placeholder="Brief preview (max 140 characters)..."
+            maxlength="140"
+            required
+          ></textarea>
+          <div
+            style="
+              text-align: right;
+              font-size: 12px;
+              color: var(--text-secondary);
+            "
+          >
+            <span id="preview-count">0</span>/140 characters
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Full Content *</label>
+          <textarea
+            class="form-textarea"
+            id="content"
+            placeholder="Write full update here..."
+            required
+          ></textarea>
+        </div>
+
+        <div class="form-buttons">
+          <button type="button" class="btn-secondary" onclick="previewUpdate()">
+            Preview
+          </button>
+          <button type="submit" class="btn-primary" id="submit-btn">
+            Publish Update
+          </button>
+        </div>
+      </form>
+
+      <!-- Preview -->
+      <div class="preview-card" id="preview-section" style="display: none">
+        <h3 class="preview-title">Preview</h3>
+        <div class="preview-content" id="preview-content">
+          Preview will appear here...
+        </div>
+      </div>
     </main>
 
     <!-- Load script normally (NOT as module) -->
     <script type="module" src="script.js"></script>
-    
+
     <script>
-        // Debug: Check if createUpdate exists
-        console.log("📋 Checking createUpdate function...");
-        console.log("Type of createUpdate:", typeof createUpdate);
-        console.log("Type of window.createUpdate:", typeof window.createUpdate);
-        
-        // Character counter
-        document.getElementById('preview').addEventListener('input', function() {
-            document.getElementById('preview-count').textContent = this.value.length;
-        });
-        
-        // Preview function
-        function previewUpdate() {
-            const type = document.getElementById('type').value;
-            const title = document.getElementById('title').value;
-            const preview = document.getElementById('preview').value;
-            const content = document.getElementById('content').value;
-            
-            if (!type || !title || !preview) {
-                alert('Please fill in required fields first');
-                return;
-            }
-            
-            const icon = type === 'whats_new' ? '🎉' : '📢';
-            const typeText = type === 'whats_new' ? "What's New" : "Notice";
-            
-            document.getElementById('preview-content').innerHTML = `
+      // Debug: Check if createUpdate exists
+      console.log("📋 Checking createUpdate function...");
+      console.log("Type of createUpdate:", typeof createUpdate);
+      console.log("Type of window.createUpdate:", typeof window.createUpdate);
+
+      // Character counter
+      document.getElementById("preview").addEventListener("input", function () {
+        document.getElementById("preview-count").textContent =
+          this.value.length;
+      });
+
+      // Preview function
+      function previewUpdate() {
+        const type = document.getElementById("type").value;
+        const title = document.getElementById("title").value;
+        const preview = document.getElementById("preview").value;
+        const content = document.getElementById("content").value;
+
+        if (!type || !title || !preview) {
+          alert("Please fill in required fields first");
+          return;
+        }
+
+        const icon = type === "whats_new" ? "🎉" : "📢";
+        const typeText = type === "whats_new" ? "What's New" : "Notice";
+
+        document.getElementById("preview-content").innerHTML = `
                 <div style="margin-bottom: 20px;">
                     <div style="font-size: 24px; margin-bottom: 10px;">${icon}</div>
                     <h3 style="font-size: 20px; margin-bottom: 5px;">${title}</h3>
@@ -122,68 +144,78 @@
                 </div>
                 <div>
                     <strong>Full Content:</strong>
-                    <p style="color: var(--text-secondary);">${content || 'No content'}</p>
+                    <p style="color: var(--text-secondary);">${content || "No content"}</p>
                 </div>
             `;
-            
-            document.getElementById('preview-section').style.display = 'block';
-        }
-        
-        // Form submission with verification
-        document.getElementById('update-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            console.log("🚀 Form submission started...");
-            
-            // Check if createUpdate function exists
-            if (typeof createUpdate !== 'function') {
-                alert("❌ Error: Update system not loaded. Please:\n1. Check console for errors\n2. Refresh the page\n3. Make sure you're logged in");
-                console.error("createUpdate is not a function. Type:", typeof createUpdate);
-                return;
+
+        document.getElementById("preview-section").style.display = "block";
+      }
+
+      // Form submission with verification
+      document
+        .getElementById("update-form")
+        .addEventListener("submit", async function (e) {
+          e.preventDefault();
+
+          console.log("🚀 Form submission started...");
+
+          // Check if createUpdate function exists
+          if (typeof createUpdate !== "function") {
+            alert(
+              "❌ Error: Update system not loaded. Please:\n1. Check console for errors\n2. Refresh the page\n3. Make sure you're logged in",
+            );
+            console.error(
+              "createUpdate is not a function. Type:",
+              typeof createUpdate,
+            );
+            return;
+          }
+
+          // Get form data
+          const updateData = {
+            type: document.getElementById("type").value,
+            title: document.getElementById("title").value,
+            preview: document.getElementById("preview").value,
+            content: document.getElementById("content").value || "",
+            priority: document.getElementById("priority").value,
+            isActive: true,
+          };
+
+          console.log("📤 Sending update data:", updateData);
+
+          // Disable button to prevent double-click
+          const submitBtn = document.getElementById("submit-btn");
+          submitBtn.disabled = true;
+          submitBtn.textContent = "Publishing...";
+
+          try {
+            // Call createUpdate function
+            const result = await createUpdate(updateData);
+
+            if (result.success) {
+              alert("✅ Update published successfully!");
+              window.location.href = "manage-updates.html";
+            } else {
+              alert("❌ Failed to publish: " + result.error);
+              submitBtn.disabled = false;
+              submitBtn.textContent = "Publish Update";
             }
-            
-            // Get form data
-            const updateData = {
-                type: document.getElementById('type').value,
-                title: document.getElementById('title').value,
-                preview: document.getElementById('preview').value,
-                content: document.getElementById('content').value || "",
-                priority: document.getElementById('priority').value,
-                isActive: true
-            };
-            
-            console.log("📤 Sending update data:", updateData);
-            
-            // Disable button to prevent double-click
-            const submitBtn = document.getElementById('submit-btn');
-            submitBtn.disabled = true;
-            submitBtn.textContent = "Publishing...";
-            
-            try {
-                // Call createUpdate function
-                const result = await createUpdate(updateData);
-                
-                if (result.success) {
-                    alert('✅ Update published successfully!');
-                    window.location.href = 'manage-updates.html';
-                } else {
-                    alert('❌ Failed to publish: ' + result.error);
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = "Publish Update";
-                }
-            } catch (error) {
-                console.error("Form submission error:", error);
-                alert('❌ Unexpected error: ' + error.message);
-                submitBtn.disabled = false;
-                submitBtn.textContent = "Publish Update";
-            }
+          } catch (error) {
+            console.error("Form submission error:", error);
+            alert("❌ Unexpected error: " + error.message);
+            submitBtn.disabled = false;
+            submitBtn.textContent = "Publish Update";
+          }
         });
-        
-        // Wait for script to load
-        window.addEventListener('load', function() {
-            console.log("✅ Page fully loaded");
-            console.log("Final check - createUpdate available:", typeof createUpdate === 'function');
-        });
+
+      // Wait for script to load
+      window.addEventListener("load", function () {
+        console.log("✅ Page fully loaded");
+        console.log(
+          "Final check - createUpdate available:",
+          typeof createUpdate === "function",
+        );
+      });
     </script>
-</body>
+  </body>
 </html>

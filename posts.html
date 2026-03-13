@@ -1,670 +1,919 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Post Management - JOYIN Admin</title>
-    <link rel="stylesheet" href="css/admin.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Posts — JOYIN Admin</title>
+    <link rel="stylesheet" href="css/admin.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="icon" type="image/x-icon" href="/J _ A192.png" />
+    <link rel="manifest" href="/admin-manifest.json" />
+    <meta name="theme-color" content="#5b53f2" />
+    <script src="/admin-pwa-install.js"></script>
+  </head>
+  <body>
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__logo"><i class="fas fa-crown"></i> JOYIN Admin</div>
+      <nav class="sidebar__nav">
+        <a href="dashboard.html" class="nav-link"
+          ><i class="fas fa-chart-line"></i> Dashboard</a
+        >
+        <a href="users.html" class="nav-link"
+          ><i class="fas fa-users"></i> Users</a
+        >
+        <a href="posts.html" class="nav-link active"
+          ><i class="fas fa-newspaper"></i> Posts</a
+        >
+        <a href="./Admin-feedback/feedback-admin.html" class="nav-link"
+          ><i class="fas fa-comment-dots"></i> Feedback</a
+        >
+        <a href="./updates/" class="nav-link"
+          ><i class="fas fa-bell"></i> Updates</a
+        >
+        <a href="./video-posts/" class="nav-link"
+          ><i class="fas fa-video"></i> Video Posts</a
+        >
+      </nav>
+      <div class="sidebar__footer">
+        <button id="logoutBtn" class="logout-btn">
+          <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
-
-    <link rel="icon" type="image/x-icon" href="/J _ A192.png">
-
-    <link rel="manifest" href="/admin-manifest.json">
-<meta name="theme-color" content="#5b53f2">
-<script src="/admin-pwa-install.js"></script>
-</head>
-<body>
-    <header class="admin-header">
-        <div class="nav-container">
-            <div class="nav-logo">
-                <i class="fas fa-crown"></i> JOYIN Admin
-            </div>
-            
-            <nav class="admin-nav">
-                <a href="dashboard.html" class="nav-link">
-                    <i class="fas fa-chart-line"></i> Dashboard
-                </a>
-                <a href="users.html" class="nav-link">
-                    <i class="fas fa-users"></i> Users
-                </a>
-                <a href="posts.html" class="nav-link active">
-                    <i class="fas fa-newspaper"></i> Posts
-                </a>
-                <button id="logoutBtn" class="logout-btn">
-                    <i class="fas fa-sign-out-alt"></i> Logout
-                </button>
-                <button id="installButton" class="pwa-install-btn" style="display: none;">
-                    <i class="fas fa-download"></i> Install App
-                </button>
-            </nav>
-        </div>
+    <!-- ── TOP BAR ── -->
+    <header class="topbar">
+      <div class="topbar__title">
+        <button class="hamburger" id="hamburger">
+          <span></span><span></span><span></span>
+        </button>
+        <i class="fas fa-newspaper"></i> Post Management
+      </div>
+      <div class="topbar__right">
+        <button id="refreshBtn" class="btn">
+          <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+      </div>
     </header>
 
-    <style>
-        .pwa-install-btn {
-    background: linear-gradient(135deg, var(--primary), var(--primary-light));
-    color: white;
-    border: none;
-    border-radius: 8px;
-    padding: 12px 24px;
-    font-size: 16px;
-    font-weight: 600;
-    cursor: pointer;
-    /* display: inline-flex; */
-    align-items: center;
-    gap: 10px;
-    box-shadow: 0 4px 15px rgba(91, 83, 242, 0.3);
-    transition: all 0.3s ease;
-    /* position: fixed; */
-    bottom: 20px;
-    right: 20px;
-    z-index: 1000;
-}
+    <!-- ── PAGE ── -->
+    <main class="page-content">
+      <!-- Quick stats -->
+      <div class="stats-grid stagger" id="postStats">
+        <div class="stat-card skeleton" style="height: 100px"></div>
+        <div class="stat-card skeleton" style="height: 100px"></div>
+        <div class="stat-card skeleton" style="height: 100px"></div>
+        <div class="stat-card skeleton" style="height: 100px"></div>
+        <div class="stat-card skeleton" style="height: 100px"></div>
+      </div>
 
-.pwa-install-btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(91, 83, 242, 0.5);
-}
+      <!-- Toolbar -->
+      <div class="card" style="margin-bottom: 20px">
+        <div class="toolbar" style="flex-wrap: wrap; gap: 10px">
+          <!-- Search -->
+          <div class="search-box" style="flex: 1; min-width: 200px">
+            <i class="fas fa-search"></i>
+            <input
+              type="text"
+              id="searchInput"
+              class="search-input"
+              placeholder="Search by content or username…"
+            />
+          </div>
 
-.pwa-install-btn:active {
-    transform: translateY(1px);
-}
-    </style>
-
-    <script>
-        const installButton = document.getElementById('installButton');
-let installPrompt = null;
-
-// Step 1: ALWAYS show the button immediately
-installButton.style.display = 'flex';
-
-// Step 2: Check if app is already installed (hide button if yes)
-if (localStorage.getItem('pwaInstalled') === 'true') {
-    installButton.style.display = 'none';
-}
-
-// Step 3: When clicked, trigger install prompt
-installButton.addEventListener('click', async () => {
-    if (installPrompt) {
-        // Show the browser's native install prompt
-        installPrompt.prompt();
-        
-        // Wait for user's decision
-        const { outcome } = await installPrompt.userChoice;
-        
-        if (outcome === 'accepted') {
-            // Hide button and mark as installed
-            installButton.style.display = 'none';
-            localStorage.setItem('pwaInstalled', 'true');
-        } else {
-            // User declined - keep button visible
-            console.log('User declined installation');
-        }
-    } else {
-        // If prompt not ready, tell user how to install manually
-        alert("Please use your browser's menu to install:\n\nChrome: Tap ⋮ → 'Install app'\nSafari: Tap Share → 'Add to Home Screen'");
-    }
-});
-
-// Step 4: Capture the install prompt when browser allows it
-window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault();
-    installPrompt = e;
-    console.log('Install prompt is now available');
-});
-
-// Step 5: When app gets installed, hide the button
-window.addEventListener('appinstalled', () => {
-    console.log('App was installed');
-    installButton.style.display = 'none';
-    localStorage.setItem('pwaInstalled', 'true');
-});
-
-// Step 6: Detect if app is deleted (check on each page load)
-window.addEventListener('load', () => {
-    // If running in standalone mode (installed), hide button
-    if (window.matchMedia('(display-mode: standalone)').matches) {
-        installButton.style.display = 'none';
-        localStorage.setItem('pwaInstalled', 'true');
-    } else {
-        // If not in standalone mode, check localStorage
-        // If we think it's installed but not in standalone mode, it was deleted
-        if (localStorage.getItem('pwaInstalled') === 'true') {
-            console.log('App was deleted - showing button again');
-            // Keep the button visible since app was deleted
-            installButton.style.display = 'flex';
-        }
-    }
-});
-
-// Step 7: Clear localStorage if you want to test the button showing again
-// To test: Open browser console and type: localStorage.removeItem('pwaInstalled')
-    </script>
-
-    <main class="dashboard-content">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
-            <h1 style="color: var(--text);">
-                <i class="fas fa-newspaper" style="color: var(--primary); margin-right: 10px;"></i>
-                Post Management
-            </h1>
-            <div style="display: flex; gap: 10px;">
-                <input type="text" id="searchPosts" class="search-box" placeholder="Search posts by content or user...">
-                <div class="date-filter">
-                    <input type="date" id="dateFrom" class="date-input" title="From date">
-                    <input type="date" id="dateTo" class="date-input" title="To date">
-                    <button id="applyDateFilter" class="action-btn btn-primary">
-                        <i class="fas fa-filter"></i> Filter
-                    </button>
-                </div>
-            </div>
+          <!-- Date range -->
+          <input type="date" id="dateFrom" class="date-input" title="From" />
+          <input type="date" id="dateTo" class="date-input" title="To" />
+          <button id="applyDate" class="btn btn-primary">
+            <i class="fas fa-filter"></i> Apply
+          </button>
+          <button id="clearDate" class="btn">
+            <i class="fas fa-times"></i> Clear
+          </button>
         </div>
-        
-        <!-- Quick Stats -->
-        <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); margin-bottom: 30px;">
-            <div class="stat-card">
-                <div class="stat-value" id="totalPosts">0</div>
-                <div class="stat-label">Total Posts</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="todayPosts">0</div>
-                <div class="stat-label">Posts Today</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="withImages">0</div>
-                <div class="stat-label">With Images</div>
-            </div>
-            <div class="stat-card">
-                <div class="stat-value" id="avgLikes">0</div>
-                <div class="stat-label">Avg. Likes</div>
-            </div>
+
+        <!-- Bulk bar -->
+        <div
+          id="bulkBar"
+          style="
+            display: none;
+            padding: 12px 24px;
+            background: var(--danger-dim);
+            border-top: 1px solid var(--border);
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+          "
+        >
+          <span
+            id="bulkCount"
+            style="font-size: 0.85rem; color: #f87171; font-weight: 600"
+          ></span>
+          <button id="bulkDeleteBtn" class="btn btn-danger">
+            <i class="fas fa-trash"></i> Delete Selected
+          </button>
+          <button onclick="clearSelection()" class="btn">
+            <i class="fas fa-times"></i> Clear
+          </button>
         </div>
-        
-        <!-- Posts Table -->
-        <div class="table-container">
-            <div class="table-header">
-                <div class="table-title">
-                    <i class="fas fa-stream"></i> All Posts (<span id="postCount">0</span>)
-                </div>
-                <div>
-                    <button id="bulkDelete" class="action-btn btn-danger" style="display: none;">
-                        <i class="fas fa-trash"></i> Delete Selected
-                    </button>
-                </div>
-            </div>
-            
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th style="width: 50px;">
-                            <input type="checkbox" id="selectAllPosts">
-                        </th>
-                        <th>Content</th>
-                        <th>User</th>
-                        <th>Date</th>
-                        <th>Likes</th>
-                        <th>Image</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="postsTable">
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 60px;">
-                            <div class="loading" style="height: 40px; margin: 0 auto;"></div>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
-            
-            <!-- Pagination -->
-            <div style="padding: 20px; border-top: 1px solid var(--card-border); display: flex; justify-content: space-between; align-items: center;">
-                <div style="color: var(--text-secondary); font-size: 14px;">
-                    Showing <span id="showingPosts">0</span> of <span id="totalPostsCount">0</span> posts
-                </div>
-                <div style="display: flex; gap: 10px;">
-                    <button id="prevPage" class="action-btn" disabled>
-                        <i class="fas fa-chevron-left"></i> Previous
-                    </button>
-                    <span id="pageInfo" style="color: var(--text); padding: 8px 16px;">Page 1</span>
-                    <button id="nextPage" class="action-btn" disabled>
-                        Next <i class="fas fa-chevron-right"></i>
-                    </button>
-                </div>
-            </div>
+      </div>
+
+      <!-- Table card -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title">
+            <i class="fas fa-stream"></i> All Posts
+            <span
+              id="postCountBadge"
+              style="
+                background: var(--surface-3);
+                padding: 2px 10px;
+                border-radius: var(--r-full);
+                font-size: 0.75rem;
+                color: var(--text-2);
+              "
+              >…</span
+            >
+          </span>
+
+          <!-- User filter banner (shown when arriving from users page) -->
+          <div
+            id="userFilterBanner"
+            style="
+              display: none;
+              align-items: center;
+              gap: 10px;
+              font-size: 0.8rem;
+              color: var(--accent-l);
+            "
+          >
+            <i class="fas fa-filter"></i>
+            <span id="userFilterLabel">Filtered by user</span>
+            <button
+              onclick="clearUserFilter()"
+              class="btn"
+              style="padding: 3px 10px; font-size: 0.75rem"
+            >
+              <i class="fas fa-times"></i> Show All
+            </button>
+          </div>
         </div>
+
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="width: 44px">
+                  <input type="checkbox" id="selectAll" />
+                </th>
+                <th>Content</th>
+                <th>Author</th>
+                <th>Date</th>
+                <th>Likes</th>
+                <th>Views</th>
+                <th>Image</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="postsBody">
+              <!-- filled by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination">
+          <div class="pagination__info">
+            Showing <strong id="showingFrom">–</strong>–<strong id="showingTo"
+              >–</strong
+            >
+            of <strong id="totalCount">–</strong> posts
+          </div>
+          <div class="pagination__controls">
+            <button id="prevPage" class="btn" disabled>
+              <i class="fas fa-chevron-left"></i> Prev
+            </button>
+            <span id="pageInfo" class="page-info">Page 1</span>
+            <button id="nextPage" class="btn">
+              Next <i class="fas fa-chevron-right"></i>
+            </button>
+          </div>
+        </div>
+      </div>
     </main>
 
-    <!-- Post Preview Modal -->
-    <div id="postModal" class="modal-overlay" style="display: none;">
-        <div class="modal" style="max-width: 600px;">
-            <div class="modal-header">
-                <h3 class="modal-title">Post Preview</h3>
-                <button class="close-modal" id="closePostModal">&times;</button>
-            </div>
-            <div id="postDetails" style="max-height: 70vh; overflow-y: auto;">
-                <!-- Dynamic content -->
-            </div>
+    <!-- ── POST DETAIL MODAL ── -->
+    <div id="postModal" class="modal-overlay">
+      <div class="modal" style="max-width: 620px">
+        <div class="modal-header">
+          <span class="modal-title"
+            ><i class="fas fa-expand-alt"></i> Post Preview</span
+          >
+          <button class="close-modal" id="closePostModal">×</button>
         </div>
+        <div
+          class="modal-body"
+          id="postModalBody"
+          style="max-height: 70vh; overflow-y: auto"
+        >
+          <!-- filled by JS -->
+        </div>
+        <div class="modal-footer" id="postModalFooter"></div>
+      </div>
     </div>
 
     <script type="module">
-        import { getAllPosts } from './js/dashboard.js';
-        import { deletePost } from './js/posts.js';
-        import { adminLogout, checkAdminAuth } from './js/auth.js';
-        
-        // Check admin auth
-        const user = await checkAdminAuth();
-        if (!user) window.location.href = 'index.html';
-        
-        // Logout
-        document.getElementById('logoutBtn').addEventListener('click', adminLogout);
-        
-        let allPosts = [];
-        let filteredPosts = [];
-        let currentPage = 1;
-        const postsPerPage = 10;
-        let selectedPosts = new Set();
-        
-        // Load posts
-        async function loadPosts() {
-            try {
-                allPosts = await getAllPosts();
-                applyPostFilters();
-                updatePostTable();
-                updatePostStats();
-            } catch (error) {
-                console.error('Error loading posts:', error);
-                document.getElementById('postsTable').innerHTML = `
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 40px; color: var(--danger);">
-                            <i class="fas fa-exclamation-triangle"></i> Failed to load posts
-                        </td>
-                    </tr>
-                `;
-            }
+      import { getAllPosts } from "./js/dashboard.js";
+      import { deletePost, batchGetUsers } from "./js/posts.js";
+      import { adminLogout, checkAdminAuth } from "./js/auth.js";
+      import {
+        showToast,
+        showLoading,
+        hideLoading,
+        showConfirm,
+        setupSidebar,
+        skeletonRows,
+        setButtonLoading,
+      } from "./js/ui.js";
+
+      // ── Auth guard ──
+      const admin = await checkAdminAuth();
+      if (!admin) window.location.href = "index.html";
+      document
+        .getElementById("logoutBtn")
+        .addEventListener("click", adminLogout);
+      setupSidebar();
+
+      // ── State ──
+      let allPosts = [];
+      let filteredPosts = [];
+      let userCache = new Map(); // uid → { username, profilePic }
+      let currentPage = 1;
+      const PER_PAGE = 10;
+      let selectedIds = new Set();
+      let activeUserId =
+        new URLSearchParams(location.search).get("user") || null;
+
+      // ================================================================
+      // DATE HELPERS
+      // ================================================================
+
+      /**
+       * Converts a Firestore Timestamp, raw {seconds} object, ISO string,
+       * or any date-like value to a JS Date.
+       * Returns null when the value is missing or unparseable.
+       */
+      function toDate(v) {
+        if (!v) return null;
+        if (typeof v.toDate === "function") return v.toDate(); // Firestore Timestamp
+        if (typeof v.seconds === "number") return new Date(v.seconds * 1000); // serialised Timestamp
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      /** Formats a date value for display, returning '—' on null/invalid. */
+      function formatDate(v, opts = {}) {
+        const d = toDate(v);
+        if (!d) return "—";
+        return d.toLocaleDateString("en-US", opts);
+      }
+
+      // ================================================================
+      // FIELD HELPERS
+      // ================================================================
+
+      /** Like count — handles numeric counter or array of user IDs. */
+      function getLikeCount(p) {
+        if (typeof p.likeCount === "number") return p.likeCount;
+        if (typeof p.likesCount === "number") return p.likesCount;
+        if (Array.isArray(p.likes)) return p.likes.length;
+        if (typeof p.likeCount === "string")
+          return parseInt(p.likeCount, 10) || 0;
+        return 0;
+      }
+
+      /** View count — stored as viewCount on the post document. */
+      function getViewCount(p) {
+        if (typeof p.viewCount === "number") return p.viewCount;
+        if (typeof p.viewsCount === "number") return p.viewsCount;
+        if (typeof p.views === "number") return p.views;
+        if (typeof p.viewCount === "string")
+          return parseInt(p.viewCount, 10) || 0;
+        return 0;
+      }
+
+      /**
+       * Resolves a post's author data from the in-memory userCache.
+       * Falls back gracefully if the user doc wasn't fetched.
+       */
+      function getAuthor(p) {
+        const cached = userCache.get(p.userId);
+        return {
+          username:
+            cached?.username || cached?.displayName || p.username || "Unknown",
+          profilePic:
+            cached?.profilePic ||
+            cached?.photoURL ||
+            p.userProfilePic ||
+            "https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3",
+        };
+      }
+
+      const FALLBACK_AVATAR =
+        "https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3";
+
+      // ================================================================
+      // LOAD
+      // ================================================================
+
+      async function loadPosts() {
+        document.getElementById("postsBody").innerHTML = skeletonRows(7, 7);
+
+        try {
+          // 1. Fetch all posts
+          allPosts = await getAllPosts();
+
+          // 2. Batch-fetch every unique author in parallel
+          //    This resolves usernames + profile pics without storing
+          //    them on each post document.
+          const userIds = [
+            ...new Set(allPosts.map((p) => p.userId).filter(Boolean)),
+          ];
+          userCache = await batchGetUsers(userIds);
+
+          applyFilters();
+          renderStats();
+          renderUserFilterBanner();
+          renderTable();
+        } catch (err) {
+          console.error("Error loading posts:", err);
+          showToast("Failed to load posts.", "error");
+          document.getElementById("postsBody").innerHTML = `
+                    <tr><td colspan="8" style="text-align:center;padding:40px;color:#f87171;">
+                        <i class="fas fa-exclamation-triangle" style="display:block;font-size:1.5rem;margin-bottom:10px;"></i>
+                        Failed to load — <button onclick="location.reload()" style="color:var(--accent-l);background:none;border:none;cursor:pointer;text-decoration:underline;">retry</button>
+                    </td></tr>`;
         }
-        
-        // Update stats
-        function updatePostStats() {
-            const today = new Date().toDateString();
-            const todayPosts = allPosts.filter(post => {
-                const postDate = post.createdAt?.toDate ? 
-                    post.createdAt.toDate().toDateString() : 
-                    new Date(post.createdAt).toDateString();
-                return postDate === today;
-            }).length;
-            
-            const postsWithImages = allPosts.filter(post => post.imageUrl).length;
-            const totalLikes = allPosts.reduce((sum, post) => sum + (post.likeCount || 0), 0);
-            const avgLikes = allPosts.length > 0 ? Math.round(totalLikes / allPosts.length) : 0;
-            
-            document.getElementById('totalPosts').textContent = allPosts.length;
-            document.getElementById('todayPosts').textContent = todayPosts;
-            document.getElementById('withImages').textContent = postsWithImages;
-            document.getElementById('avgLikes').textContent = avgLikes;
+      }
+
+      // ================================================================
+      // STATS
+      // ================================================================
+
+      function renderStats() {
+        const today = new Date().toDateString();
+        const todayCount = allPosts.filter((p) => {
+          const d = toDate(p.createdAt);
+          return d && d.toDateString() === today;
+        }).length;
+
+        const withImg = allPosts.filter((p) => p.imageUrl?.trim()).length;
+        const totalLikes = allPosts.reduce((s, p) => s + getLikeCount(p), 0);
+        const totalViews = allPosts.reduce((s, p) => s + getViewCount(p), 0);
+        const avgLikes = allPosts.length
+          ? (totalLikes / allPosts.length).toFixed(1)
+          : 0;
+
+        document.getElementById("postStats").innerHTML = `
+                <div class="stat-card">
+                    <div class="stat-card__icon"><i class="fas fa-newspaper"></i></div>
+                    <div class="stat-value">${allPosts.length.toLocaleString()}</div>
+                    <div class="stat-label">Total Posts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon"><i class="fas fa-calendar-day"></i></div>
+                    <div class="stat-value">${todayCount}</div>
+                    <div class="stat-label">Posts Today</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon"><i class="fas fa-eye"></i></div>
+                    <div class="stat-value">${totalViews.toLocaleString()}</div>
+                    <div class="stat-label">Total Views</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon"><i class="fas fa-heart"></i></div>
+                    <div class="stat-value">${avgLikes}</div>
+                    <div class="stat-label">Avg Likes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-card__icon"><i class="fas fa-image"></i></div>
+                    <div class="stat-value">${withImg}</div>
+                    <div class="stat-label">With Images</div>
+                </div>
+            `;
+      }
+
+      // ================================================================
+      // USER FILTER BANNER
+      // ================================================================
+
+      function renderUserFilterBanner() {
+        const banner = document.getElementById("userFilterBanner");
+        if (activeUserId) {
+          const author = getAuthor({ userId: activeUserId });
+          document.getElementById("userFilterLabel").textContent =
+            `Showing posts by: ${author.username}`;
+          banner.style.display = "flex";
+        } else {
+          banner.style.display = "none";
         }
-        
-        // Apply filters
-        function applyPostFilters() {
-            let posts = [...allPosts];
-            const searchTerm = document.getElementById('searchPosts').value.toLowerCase();
-            const dateFrom = document.getElementById('dateFrom').value;
-            const dateTo = document.getElementById('dateTo').value;
-            
-            // Search filter
-            if (searchTerm) {
-                posts = posts.filter(p => 
-                    (p.text || '').toLowerCase().includes(searchTerm) ||
-                    (p.username || '').toLowerCase().includes(searchTerm)
-                );
-            }
-            
-            // Date filter
-            if (dateFrom) {
-                const fromDate = new Date(dateFrom);
-                posts = posts.filter(p => {
-                    const postDate = p.createdAt?.toDate ? p.createdAt.toDate() : new Date(p.createdAt);
-                    return postDate >= fromDate;
-                });
-            }
-            
-            if (dateTo) {
-                const toDate = new Date(dateTo);
-                toDate.setHours(23, 59, 59, 999);
-                posts = posts.filter(p => {
-                    const postDate = p.createdAt?.toDate ? p.createdAt.toDate() : new Date(p.createdAt);
-                    return postDate <= toDate;
-                });
-            }
-            
-            filteredPosts = posts;
-            currentPage = 1;
+      }
+
+      window.clearUserFilter = function () {
+        activeUserId = null;
+        // Remove ?user= from URL without reloading
+        const url = new URL(location.href);
+        url.searchParams.delete("user");
+        history.replaceState({}, "", url);
+        renderUserFilterBanner();
+        applyFilters();
+        renderTable();
+      };
+
+      // ================================================================
+      // FILTERS
+      // ================================================================
+
+      function applyFilters() {
+        let posts = [...allPosts];
+        const term = document
+          .getElementById("searchInput")
+          .value.toLowerCase()
+          .trim();
+        const from = document.getElementById("dateFrom").value;
+        const to = document.getElementById("dateTo").value;
+
+        // User filter (from ?user= query param)
+        if (activeUserId)
+          posts = posts.filter((p) => p.userId === activeUserId);
+
+        // Search — checks post text AND resolved username from cache
+        if (term) {
+          posts = posts.filter((p) => {
+            const author = getAuthor(p);
+            return (
+              (p.text || "").toLowerCase().includes(term) ||
+              author.username.toLowerCase().includes(term)
+            );
+          });
         }
-        
-        // Update table
-        function updatePostTable() {
-            const start = (currentPage - 1) * postsPerPage;
-            const end = start + postsPerPage;
-            const pagePosts = filteredPosts.slice(start, end);
-            
-            document.getElementById('postCount').textContent = filteredPosts.length;
-            document.getElementById('totalPostsCount').textContent = filteredPosts.length;
-            document.getElementById('showingPosts').textContent = `${start + 1}-${Math.min(end, filteredPosts.length)}`;
-            
-            // Update pagination
-            document.getElementById('prevPage').disabled = currentPage === 1;
-            document.getElementById('nextPage').disabled = end >= filteredPosts.length;
-            document.getElementById('pageInfo').textContent = `Page ${currentPage}`;
-            
-            // Update table rows
-            const tbody = document.getElementById('postsTable');
-            tbody.innerHTML = '';
-            
-            if (pagePosts.length === 0) {
-                tbody.innerHTML = `
-                    <tr>
-                        <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                            <i class="fas fa-newspaper"></i> No posts found
-                        </td>
-                    </tr>
-                `;
-                return;
-            }
-            
-            pagePosts.forEach(post => {
-                const postDate = post.createdAt?.toDate ? 
-                    post.createdAt.toDate() : 
-                    new Date(post.createdAt);
-                const hasImage = post.imageUrl && post.imageUrl.trim() !== '';
-                const previewText = post.text ? 
-                    (post.text.length > 100 ? post.text.substring(0, 100) + '...' : post.text) : 
-                    '[No text]';
-                
-                tbody.innerHTML += `
-                    <tr>
-                        <td>
-                            <input type="checkbox" class="post-checkbox" value="${post.id}" 
-                                   ${selectedPosts.has(post.id) ? 'checked' : ''}>
-                        </td>
-                        <td>
-                            <div class="post-preview">
-                                ${previewText}
-                            </div>
-                            <button onclick="viewPostDetails('${post.id}')" 
-                                    class="action-btn" 
-                                    style="padding: 4px 8px; font-size: 12px; margin-top: 5px;">
-                                <i class="fas fa-expand"></i> View Full
-                            </button>
-                        </td>
-                        <td>
-                            <div style="display: flex; align-items: center; gap: 8px;">
-                                <img src="${post.userProfilePic || 'https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3'}" 
-                                     style="width: 30px; height: 30px; border-radius: 50%;">
-                                <span>${post.username || 'Unknown'}</span>
-                            </div>
-                        </td>
-                        <td>
-                            ${postDate.toLocaleDateString()}<br>
-                            <small style="color: var(--text-secondary);">
-                                ${postDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                            </small>
-                        </td>
-                        <td>
-                            <span style="color: ${post.likeCount > 0 ? '#5b53f2' : '#aaa'};">
-                                <i class="fas fa-heart"></i> ${post.likeCount || 0}
-                            </span>
-                        </td>
-                        <td>
-                            ${hasImage ? 
-                                `<span class="status-badge badge-active" style="background: rgba(91, 83, 242, 0.1);">
-                                    <i class="fas fa-image"></i> Yes
-                                </span>` : 
-                                `<span style="color: var(--text-secondary);">No</span>`
-                            }
-                        </td>
-                        <td>
-                            <div style="display: flex; gap: 5px;">
-                                <button onclick="viewPostDetails('${post.id}')" 
-                                        class="action-btn" title="Preview">
-                                    <i class="fas fa-eye"></i>
-                                </button>
-                                <button onclick="deleteSinglePost('${post.id}')" 
-                                        class="action-btn btn-danger" title="Delete">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                                <button onclick="gotoUser('${post.userId}')" 
-                                        class="action-btn btn-primary" title="View User">
-                                    <i class="fas fa-user"></i>
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            // Update bulk delete button
-            document.getElementById('bulkDelete').style.display = 
-                selectedPosts.size > 0 ? 'inline-block' : 'none';
+
+        // Date range
+        if (from) {
+          const d = new Date(from);
+          posts = posts.filter((p) => {
+            const pd = toDate(p.createdAt);
+            return pd && pd >= d;
+          });
         }
-        
-        // View post details
-        window.viewPostDetails = async function(postId) {
-            const post = allPosts.find(p => p.id === postId);
-            if (!post) return;
-            
-            const postDate = post.createdAt?.toDate ? 
-                post.createdAt.toDate() : 
-                new Date(post.createdAt);
-            
-            document.getElementById('postDetails').innerHTML = `
-                <div style="margin-bottom: 20px;">
-                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 20px;">
-                        <img src="${post.userProfilePic || 'https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3'}" 
-                             style="width: 60px; height: 60px; border-radius: 50%;">
-                        <div>
-                            <h4 style="margin: 0;">${post.username || 'Unknown User'}</h4>
-                            <p style="color: var(--text-secondary); margin: 5px 0 0 0;">
-                                ${postDate.toLocaleString()}
-                            </p>
-                            <button onclick="gotoUser('${post.userId}')" 
-                                    class="action-btn btn-primary" 
-                                    style="padding: 4px 8px; font-size: 12px; margin-top: 5px;">
-                                <i class="fas fa-external-link-alt"></i> View User Profile
-                            </button>
+        if (to) {
+          const d = new Date(to);
+          d.setHours(23, 59, 59, 999);
+          posts = posts.filter((p) => {
+            const pd = toDate(p.createdAt);
+            return pd && pd <= d;
+          });
+        }
+
+        filteredPosts = posts;
+        currentPage = 1;
+      }
+
+      // ================================================================
+      // RENDER TABLE
+      // ================================================================
+
+      function renderTable() {
+        const tbody = document.getElementById("postsBody");
+        const start = (currentPage - 1) * PER_PAGE;
+        const end = start + PER_PAGE;
+        const page = filteredPosts.slice(start, end);
+
+        document.getElementById("postCountBadge").textContent =
+          filteredPosts.length;
+        document.getElementById("totalCount").textContent =
+          filteredPosts.length;
+        document.getElementById("showingFrom").textContent =
+          filteredPosts.length ? start + 1 : 0;
+        document.getElementById("showingTo").textContent = Math.min(
+          end,
+          filteredPosts.length,
+        );
+        document.getElementById("pageInfo").textContent = `Page ${currentPage}`;
+        document.getElementById("prevPage").disabled = currentPage === 1;
+        document.getElementById("nextPage").disabled =
+          end >= filteredPosts.length;
+
+        if (!page.length) {
+          tbody.innerHTML = `
+                    <tr><td colspan="8" style="text-align:center;padding:50px;">
+                        <div class="empty-state">
+                            <i class="fas fa-newspaper"></i>
+                            <p>No posts match your filter.</p>
                         </div>
-                    </div>
-                    
-                    <div style="background: rgba(255,255,255,0.03); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                        <p style="white-space: pre-wrap; line-height: 1.6;">${post.text || '[No text content]'}</p>
-                    </div>
-                    
-                    ${post.imageUrl ? `
-                        <div style="margin-bottom: 20px;">
-                            <div class="stat-label" style="margin-bottom: 10px;">Image</div>
-                            <img src="${post.imageUrl}" 
-                                 style="max-width: 100%; border-radius: 10px; border: 1px solid var(--card-border);"
-                                 onerror="this.style.display='none';">
-                        </div>
-                    ` : ''}
-                    
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px;">
-                        <div class="stat-card" style="padding: 15px;">
-                            <div class="stat-label">Likes</div>
-                            <div class="stat-value">${post.likeCount || 0}</div>
-                        </div>
-                        <div class="stat-card" style="padding: 15px;">
-                            <div class="stat-label">Post ID</div>
-                            <div style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">
-                                ${post.id.substring(0, 16)}...
-                            </div>
-                        </div>
-                        <div class="stat-card" style="padding: 15px;">
-                            <div class="stat-label">User ID</div>
-                            <div style="font-size: 12px; color: var(--text-secondary); font-family: monospace;">
-                                ${post.userId.substring(0, 16)}...
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; justify-content: center;">
-                        <button onclick="deleteSinglePost('${post.id}', true)" 
-                                class="action-btn btn-danger" style="flex: 1;">
-                            <i class="fas fa-trash"></i> Delete Post
+                    </td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = page
+          .map((p) => {
+            const d = toDate(p.createdAt);
+            const hasImg = p.imageUrl?.trim();
+            const preview =
+              (p.text || "").substring(0, 90) +
+              ((p.text?.length || 0) > 90 ? "…" : "");
+            const likes = getLikeCount(p);
+            const views = getViewCount(p);
+
+            // Resolve username + pic from cache — NOT from post document
+            const author = getAuthor(p);
+
+            return `
+                <tr>
+                    <td><input type="checkbox" class="row-check" value="${p.id}" ${selectedIds.has(p.id) ? "checked" : ""}></td>
+                    <td style="max-width:260px;">
+                        <p class="post-preview-text">${preview || "<em>[No text]</em>"}</p>
+                        <button class="btn text-xs" style="margin-top:6px;padding:3px 8px;" onclick="viewPost('${p.id}')">
+                            <i class="fas fa-eye"></i> Preview
                         </button>
-                        <button onclick="window.open('${post.imageUrl}', '_blank')" 
-                                ${!post.imageUrl ? 'disabled' : ''}
-                                class="action-btn btn-primary" style="flex: 1;">
-                            <i class="fas fa-external-link-alt"></i> Open Image
-                        </button>
+                    </td>
+                    <td>
+                        <div class="flex-center gap-8">
+                            <img src="${author.profilePic}" class="avatar" style="width:30px;height:30px;"
+                                 onerror="this.src='${FALLBACK_AVATAR}'">
+                            <span class="text-sm">${author.username}</span>
+                        </div>
+                    </td>
+                    <td class="text-sm text-muted">
+                        ${d ? d.toLocaleDateString() : "—"}<br>
+                        <span class="text-xs text-faint">
+                            ${d ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="${likes > 0 ? "badge badge-new" : "text-faint text-sm"}">
+                            <i class="fas fa-heart"></i> ${likes}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="${views > 0 ? "text-sm" : "text-faint text-sm"}">
+                            <i class="fas fa-eye"></i> ${views.toLocaleString()}
+                        </span>
+                    </td>
+                    <td>
+                        ${
+                          hasImg
+                            ? `<span class="badge badge-active"><i class="fas fa-image"></i> Yes</span>`
+                            : `<span class="text-faint text-xs">—</span>`
+                        }
+                    </td>
+                    <td>
+                        <div class="flex-center gap-8">
+                            <button class="btn btn-icon" title="Preview" onclick="viewPost('${p.id}')">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn btn-icon btn-danger" title="Delete" onclick="deleteSingle('${p.id}', this)">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                            <button class="btn btn-icon btn-primary" title="View user"
+                                    onclick="window.location.href='users.html#${p.userId}'">
+                                <i class="fas fa-user"></i>
+                            </button>
+                        </div>
+                    </td>
+                </tr>`;
+          })
+          .join("");
+
+        document
+          .querySelectorAll(".row-check")
+          .forEach((cb) => cb.addEventListener("change", handleRowCheck));
+      }
+
+      // ================================================================
+      // CHECKBOX SELECTION
+      // ================================================================
+
+      function handleRowCheck(e) {
+        if (e.target.checked) selectedIds.add(e.target.value);
+        else {
+          selectedIds.delete(e.target.value);
+          document.getElementById("selectAll").checked = false;
+        }
+        updateBulkBar();
+      }
+
+      function updateBulkBar() {
+        const bar = document.getElementById("bulkBar");
+        if (selectedIds.size) {
+          bar.style.display = "flex";
+          document.getElementById("bulkCount").textContent =
+            `${selectedIds.size} post${selectedIds.size > 1 ? "s" : ""} selected`;
+        } else {
+          bar.style.display = "none";
+        }
+      }
+
+      window.clearSelection = function () {
+        selectedIds.clear();
+        document.getElementById("selectAll").checked = false;
+        document
+          .querySelectorAll(".row-check")
+          .forEach((cb) => (cb.checked = false));
+        updateBulkBar();
+      };
+
+      document
+        .getElementById("selectAll")
+        .addEventListener("change", function () {
+          const page = filteredPosts.slice(
+            (currentPage - 1) * PER_PAGE,
+            currentPage * PER_PAGE,
+          );
+          page.forEach((p) => {
+            if (this.checked) selectedIds.add(p.id);
+            else selectedIds.delete(p.id);
+          });
+          document
+            .querySelectorAll(".row-check")
+            .forEach((cb) => (cb.checked = this.checked));
+          updateBulkBar();
+        });
+
+      // ================================================================
+      // SINGLE DELETE
+      // ================================================================
+
+      window.deleteSingle = async function (postId, btn) {
+        const confirmed = await showConfirm({
+          title: "Delete this post?",
+          message:
+            "This cannot be undone. The post, all likes, and all comments will be removed.",
+          confirmText: "Delete",
+          intent: "danger",
+        });
+        if (!confirmed) return;
+
+        const restore = setButtonLoading(btn, "");
+        showLoading("Deleting post…");
+        try {
+          const result = await deletePost(postId);
+          if (result.success) {
+            showToast("Post deleted.", "success");
+            allPosts = allPosts.filter((p) => p.id !== postId);
+            applyFilters();
+            renderStats();
+            renderTable();
+          } else {
+            showToast("Error: " + result.error, "error");
+          }
+        } catch (err) {
+          showToast("Unexpected error.", "error");
+        } finally {
+          hideLoading();
+          restore();
+        }
+      };
+
+      // ================================================================
+      // BULK DELETE
+      // ================================================================
+
+      document
+        .getElementById("bulkDeleteBtn")
+        .addEventListener("click", async function () {
+          if (!selectedIds.size) return;
+          const confirmed = await showConfirm({
+            title: `Delete ${selectedIds.size} post${selectedIds.size > 1 ? "s" : ""}?`,
+            message:
+              "This cannot be undone. All likes and comments will also be removed.",
+            confirmText: `Delete ${selectedIds.size}`,
+            intent: "danger",
+          });
+          if (!confirmed) return;
+
+          const restore = setButtonLoading(this, "Deleting…");
+          showLoading(`Deleting ${selectedIds.size} posts…`);
+          let ok = 0,
+            fail = 0;
+          try {
+            for (const id of selectedIds) {
+              const r = await deletePost(id);
+              r.success ? ok++ : fail++;
+            }
+            showToast(
+              `${ok} post${ok > 1 ? "s" : ""} deleted.${fail ? ` ${fail} failed.` : ""}`,
+              fail ? "warning" : "success",
+            );
+            selectedIds.clear();
+            await loadPosts();
+          } catch (err) {
+            showToast("Some deletions failed.", "error");
+          } finally {
+            hideLoading();
+            restore();
+            updateBulkBar();
+          }
+        });
+
+      // ================================================================
+      // VIEW POST MODAL
+      // ================================================================
+
+      window.viewPost = function (postId) {
+        const p = allPosts.find((x) => x.id === postId);
+        if (!p) return;
+
+        const d = toDate(p.createdAt);
+        const author = getAuthor(p); // resolved from userCache
+        const likes = getLikeCount(p);
+        const views = getViewCount(p);
+
+        document.getElementById("postModalBody").innerHTML = `
+                <!-- Author header — username + pic from live user cache -->
+                <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+                    <img src="${author.profilePic}"
+                         style="width:50px;height:50px;border-radius:50%;object-fit:cover;"
+                         onerror="this.src='${FALLBACK_AVATAR}'">
+                    <div>
+                        <strong>${author.username}</strong>
+                        <div class="text-xs text-muted">${d ? d.toLocaleString() : "—"}</div>
+                    </div>
+                </div>
+
+                ${
+                  p.text
+                    ? `
+                    <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:var(--r-md);padding:16px;margin-bottom:16px;white-space:pre-wrap;line-height:1.6;font-size:.9rem;">
+                        ${p.text}
+                    </div>
+                `
+                    : ""
+                }
+
+                ${
+                  p.imageUrl?.trim()
+                    ? `
+                    <div style="margin-bottom:16px;">
+                        <img src="${p.imageUrl}"
+                             style="width:100%;border-radius:var(--r-md);border:1px solid var(--border);"
+                             onerror="this.style.display='none'">
+                    </div>
+                `
+                    : ""
+                }
+
+                <!-- Stats grid -->
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="detail-item__label">Post ID</div>
+                        <div class="detail-item__value mono text-xs">${p.id}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-item__label">User ID</div>
+                        <div class="detail-item__value mono text-xs">${p.userId}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-item__label"><i class="fas fa-heart"></i> Likes</div>
+                        <div class="detail-item__value">${likes.toLocaleString()}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-item__label"><i class="fas fa-eye"></i> Views</div>
+                        <div class="detail-item__value">${views.toLocaleString()}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-item__label">Date</div>
+                        <div class="detail-item__value">${d ? d.toLocaleString() : "—"}</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-item__label">Has Image</div>
+                        <div class="detail-item__value">${p.imageUrl?.trim() ? "Yes" : "No"}</div>
                     </div>
                 </div>
             `;
-            
-            document.getElementById('postModal').style.display = 'flex';
-        };
-        
-        // Delete single post
-        window.deleteSinglePost = async function(postId, fromModal = false) {
-            if (confirm('Delete this post? This action cannot be undone.')) {
-                const result = await deletePost(postId);
-                
-                if (result.success) {
-                    alert(result.message);
-                    loadPosts(); // Refresh the list
-                    if (fromModal) {
-                        document.getElementById('postModal').style.display = 'none';
-                    }
-                } else {
-                    alert('Error: ' + result.error);
+
+        document.getElementById("postModalFooter").innerHTML = `
+                <button class="btn btn-danger" id="modalDeleteBtn">
+                    <i class="fas fa-trash"></i> Delete Post
+                </button>
+                <button class="btn btn-primary"
+                        onclick="window.location.href='users.html#${p.userId}'">
+                    <i class="fas fa-user"></i> View Author
+                </button>
+                ${
+                  p.imageUrl?.trim()
+                    ? `
+                    <button class="btn" onclick="window.open('${p.imageUrl}','_blank')">
+                        <i class="fas fa-external-link-alt"></i> Open Image
+                    </button>
+                `
+                    : ""
                 }
-            }
-        };
-        
-        // Go to user
-        window.gotoUser = function(userId) {
-            window.location.href = `users.html#${userId}`;
-        };
-        
-        // Close modal
-        document.getElementById('closePostModal').addEventListener('click', () => {
-            document.getElementById('postModal').style.display = 'none';
-        });
-        
-        // Close modal on overlay click
-        document.getElementById('postModal').addEventListener('click', (e) => {
-            if (e.target === document.getElementById('postModal')) {
-                document.getElementById('postModal').style.display = 'none';
-            }
-        });
-        
-        // Select all checkbox
-        document.getElementById('selectAllPosts').addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.post-checkbox');
-            checkboxes.forEach(cb => {
-                cb.checked = this.checked;
-                if (this.checked) {
-                    selectedPosts.add(cb.value);
-                } else {
-                    selectedPosts.delete(cb.value);
-                }
-            });
-            updateBulkDeleteButton();
-        });
-        
-        // Individual checkbox
-        document.addEventListener('change', function(e) {
-            if (e.target.classList.contains('post-checkbox')) {
-                if (e.target.checked) {
-                    selectedPosts.add(e.target.value);
-                } else {
-                    selectedPosts.delete(e.target.value);
-                    document.getElementById('selectAllPosts').checked = false;
-                }
-                updateBulkDeleteButton();
-            }
-        });
-        
-        function updateBulkDeleteButton() {
-            document.getElementById('bulkDelete').style.display = 
-                selectedPosts.size > 0 ? 'inline-block' : 'none';
-            document.getElementById('bulkDelete').innerHTML = `
-                <i class="fas fa-trash"></i> Delete Selected (${selectedPosts.size})
             `;
-        }
-        
-        // Bulk delete
-        document.getElementById('bulkDelete').addEventListener('click', async function() {
-            if (selectedPosts.size === 0) return;
-            
-            if (confirm(`Delete ${selectedPosts.size} selected post(s)? This cannot be undone.`)) {
-                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Deleting...';
-                this.disabled = true;
-                
-                let successCount = 0;
-                let failCount = 0;
-                
-                for (const postId of selectedPosts) {
-                    const result = await deletePost(postId);
-                    if (result.success) {
-                        successCount++;
-                    } else {
-                        failCount++;
-                        console.error(`Failed to delete post ${postId}:`, result.error);
-                    }
-                }
-                
-                selectedPosts.clear();
-                loadPosts();
-                
-                alert(`Deleted ${successCount} post(s) successfully. ${failCount > 0 ? `${failCount} failed.` : ''}`);
-                
-                this.disabled = false;
+
+        document
+          .getElementById("modalDeleteBtn")
+          .addEventListener("click", async function () {
+            const confirmed = await showConfirm({
+              title: "Delete this post?",
+              message: "This cannot be undone.",
+              confirmText: "Delete",
+              intent: "danger",
+            });
+            if (!confirmed) return;
+            const restore = setButtonLoading(this, "Deleting…");
+            showLoading("Deleting post…");
+            try {
+              const r = await deletePost(p.id);
+              if (r.success) {
+                showToast("Post deleted.", "success");
+                document.getElementById("postModal").classList.remove("open");
+                allPosts = allPosts.filter((x) => x.id !== p.id);
+                applyFilters();
+                renderStats();
+                renderTable();
+              } else {
+                showToast("Error: " + r.error, "error");
+              }
+            } finally {
+              hideLoading();
+              restore();
             }
+          });
+
+        document.getElementById("postModal").classList.add("open");
+      };
+
+      document
+        .getElementById("closePostModal")
+        .addEventListener("click", () =>
+          document.getElementById("postModal").classList.remove("open"),
+        );
+
+      document.getElementById("postModal").addEventListener("click", (e) => {
+        if (e.target === document.getElementById("postModal"))
+          document.getElementById("postModal").classList.remove("open");
+      });
+
+      // ================================================================
+      // PAGINATION
+      // ================================================================
+
+      document.getElementById("prevPage").addEventListener("click", () => {
+        currentPage--;
+        renderTable();
+      });
+      document.getElementById("nextPage").addEventListener("click", () => {
+        currentPage++;
+        renderTable();
+      });
+
+      // ================================================================
+      // FILTERS / SEARCH / DATE
+      // ================================================================
+
+      let searchTimer;
+      document.getElementById("searchInput").addEventListener("input", () => {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+          applyFilters();
+          renderTable();
+        }, 300);
+      });
+
+      document.getElementById("applyDate").addEventListener("click", () => {
+        applyFilters();
+        renderTable();
+      });
+
+      document.getElementById("clearDate").addEventListener("click", () => {
+        document.getElementById("dateFrom").value = "";
+        document.getElementById("dateTo").value = "";
+        applyFilters();
+        renderTable();
+      });
+
+      // Enforce min date on "to" when "from" changes
+      document
+        .getElementById("dateFrom")
+        .addEventListener("change", function () {
+          if (this.value) document.getElementById("dateTo").min = this.value;
         });
-        
-        // Search
-        document.getElementById('searchPosts').addEventListener('input', () => {
-            applyPostFilters();
-            updatePostTable();
-        });
-        
-        // Date filter
-        document.getElementById('applyDateFilter').addEventListener('click', () => {
-            applyPostFilters();
-            updatePostTable();
-        });
-        
-        // Clear date filter
-        document.getElementById('dateFrom').addEventListener('change', function() {
-            if (this.value) {
-                document.getElementById('dateTo').min = this.value;
-            }
-        });
-        
-        document.getElementById('dateTo').addEventListener('change', function() {
-            if (this.value && document.getElementById('dateFrom').value) {
-                applyPostFilters();
-                updatePostTable();
-            }
-        });
-        
-        // Pagination
-        document.getElementById('prevPage').addEventListener('click', () => {
-            if (currentPage > 1) {
-                currentPage--;
-                updatePostTable();
-            }
-        });
-        
-        document.getElementById('nextPage').addEventListener('click', () => {
-            if (currentPage * postsPerPage < filteredPosts.length) {
-                currentPage++;
-                updatePostTable();
-            }
-        });
-        
-        // Initialize
-        loadPosts();
+
+      document
+        .getElementById("refreshBtn")
+        .addEventListener("click", loadPosts);
+
+      // ── Init ──
+      loadPosts();
     </script>
-</body>
+  </body>
 </html>

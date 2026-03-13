@@ -1,692 +1,907 @@
-/* 
- * JOYIN ADMIN VIDEO PANEL - JAVASCRIPT
- * Manage video posts, view statistics, delete videos
- * (c) 2025 JOYIN
+/* ================================================================
+   JOYIN ADMIN — VIDEO POSTS MODULE  (video-posts/admin-video.js)
+   Manages the /video-posts Firestore collection:
+     - Load all video posts, batch-resolve usernames + profile pics
+       from /users (not stored on the post document any more)
+     - Grid view (TikTok-style) ⟷ Table view (like Users/Posts pages)
+     - viewCount displayed in cards, table rows, modal, and stat strip
+     - Preview a video in a modal player
+     - Delete from Firestore + Cloudinary with confirmation
+   ================================================================ */
+
+import { db } from "../js/firebase.js";
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  deleteDoc,
+  query,
+  orderBy,
+  writeBatch,
+  increment,
+  limit,
+  startAfter,
+} from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
+
+import { deleteCloudinaryVideo } from "../js/deleteCloudinary.js";
+
+import {
+  showToast,
+  showLoading,
+  hideLoading,
+  showConfirm,
+  setButtonLoading,
+  skeletonRows,
+} from "../js/ui.js";
+
+// ── STATE ─────────────────────────────────────────────────────
+
+let allPosts = [];
+let filteredPosts = [];
+let userCache = new Map(); // uid → { username, profilePic, ... }
+let activePost = null;
+
+let currentPage = 1;
+const POSTS_PER_PAGE = 20;
+let searchTimer;
+let currentTimeFilter = "all";
+let currentView = "grid"; // 'grid' | 'table'
+
+// ── INIT ──────────────────────────────────────────────────────
+
+document.addEventListener("DOMContentLoaded", () => {
+  setupEventListeners();
+  loadPosts();
+});
+
+// ── BATCH USER FETCHER ────────────────────────────────────────
+
+/**
+ * Fetches multiple user documents by UID and returns a Map<uid, data>.
+ * Runs in parallel chunks of 30 to stay well under Firestore limits.
+ * This is how we get up-to-date usernames + profile pics without
+ * storing them on each video-post document.
+ *
+ * @param {string[]} userIds
+ * @returns {Promise<Map<string, object>>}
  */
+async function batchGetUsers(userIds) {
+  const unique = [...new Set(userIds)].filter(Boolean);
+  const cache = new Map();
+  if (!unique.length) return cache;
 
-import { auth, db, storage } from "../js/firebase.js";
-import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-auth.js";
-import { collection, query, getDocs, deleteDoc, doc, orderBy, where } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
-import { ref, deleteObject } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js";
+  const CHUNK = 30;
+  const chunks = [];
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    chunks.push(unique.slice(i, i + CHUNK));
+  }
 
-// ============================================
-// GLOBAL VARIABLES
-// ============================================
+  await Promise.all(
+    chunks.map((chunk) =>
+      Promise.all(
+        chunk.map(async (uid) => {
+          try {
+            const snap = await getDoc(doc(db, "users", uid));
+            if (snap.exists()) cache.set(uid, snap.data());
+          } catch (e) {
+            console.warn(`[batchGetUsers] Could not fetch ${uid}:`, e.message);
+          }
+        }),
+      ),
+    ),
+  );
 
-let currentUser = null;
-let allVideos = [];                 // All loaded videos
-let filteredVideos = [];            // Filtered videos (for search/filter)
-let currentFilter = 'all';          // Current active filter
-let selectedVideoData = null;       // Currently selected video for deletion
+  console.log(`[batchGetUsers] Resolved ${cache.size}/${unique.length} users`);
+  return cache;
+}
 
-// DOM Elements
-const loadingContainer = document.getElementById('loadingContainer');
-const videoList = document.getElementById('videoList');
-const noVideosMessage = document.getElementById('noVideosMessage');
-const searchInput = document.getElementById('searchInput');
-const filterButtons = document.querySelectorAll('.filter-btn');
-const refreshBtn = document.getElementById('refreshBtn');
-const backBtn = document.getElementById('backBtn');
+// ── FIELD HELPERS ─────────────────────────────────────────────
 
-// Modal Elements
-const previewModal = document.getElementById('previewModal');
-const confirmModal = document.getElementById('confirmModal');
-const closeModal = document.getElementById('closeModal');
-const cancelBtn = document.getElementById('cancelBtn');
-const deleteVideoBtn = document.getElementById('deleteVideoBtn');
-const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-const confirmCancelBtn = document.getElementById('confirmCancelBtn');
-const modalVideo = document.getElementById('modalVideo');
+/**
+ * Resolves a post's author from the in-memory userCache.
+ * Falls back to any stale data stored on the post, then to defaults.
+ */
+function getAuthor(post) {
+  const cached = userCache.get(post.userId);
+  return {
+    username:
+      cached?.username || cached?.displayName || post.username || "Unknown",
+    profilePic:
+      cached?.profilePic ||
+      cached?.photoURL ||
+      post.userProfilePic ||
+      defaultAvatar(),
+  };
+}
 
-// ============================================
-// AUTHENTICATION & ADMIN CHECK
-// ============================================
+/**
+ * View count — handles viewCount, viewsCount, views field names.
+ */
+function getViewCount(p) {
+  if (typeof p.viewCount === "number") return p.viewCount;
+  if (typeof p.viewsCount === "number") return p.viewsCount;
+  if (typeof p.views === "number") return p.views;
+  if (typeof p.viewCount === "string") return parseInt(p.viewCount, 10) || 0;
+  return 0;
+}
 
-onAuthStateChanged(auth, async (user) => {
-    if (user) {
-        console.log("✅ User authenticated:", user.uid);
-        currentUser = user;
-        
-        // Check if user is admin
-        // const isAdmin = await checkAdminStatus(user.uid);
-        
-        // if (!isAdmin) {
-        //     console.log("❌ User is not admin, redirecting...");
-        //     alert("Access Denied: Admin privileges required");
-        //     window.location.href = "../dashboard/";
-        //     return;
-        // }
-        
-        console.log("✅ Admin access granted");
-        
-        // Load videos
-        await loadAllVideos();
-        
+/**
+ * Like count — handles likeCount counter or likes array.
+ */
+function getLikeCount(p) {
+  if (typeof p.likeCount === "number") return p.likeCount;
+  if (typeof p.likesCount === "number") return p.likesCount;
+  if (Array.isArray(p.likes)) return p.likes.length;
+  if (typeof p.likeCount === "string") return parseInt(p.likeCount, 10) || 0;
+  return 0;
+}
+
+// ── DATE HELPERS ──────────────────────────────────────────────
+
+/**
+ * Null-safe conversion of a Firestore Timestamp, {seconds} object,
+ * ISO string, or any date-like value to a JS Date.
+ * Returns null for missing / unparseable values.
+ */
+function toDate(v) {
+  if (!v) return null;
+  if (typeof v.toDate === "function") return v.toDate();
+  if (typeof v.seconds === "number") return new Date(v.seconds * 1000);
+  const d = new Date(v);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// ── DATA LOADING ──────────────────────────────────────────────
+
+async function loadPosts() {
+  if (currentView === "grid") {
+    document.getElementById("videoGrid").innerHTML =
+      buildSkeletonGrid(POSTS_PER_PAGE);
+  } else {
+    document.getElementById("videoTableBody").innerHTML = skeletonRows(8, 8);
+  }
+
+  try {
+    const q = query(
+      collection(db, "video-posts"),
+      orderBy("createdAt", "desc"),
+    );
+    const snap = await getDocs(q);
+    allPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+    // Batch-resolve all authors from /users — one parallel fetch round-trip
+    const uids = [...new Set(allPosts.map((p) => p.userId).filter(Boolean))];
+    userCache = await batchGetUsers(uids);
+
+    applyFilters();
+    renderStats();
+    render();
+
+    console.log(
+      `[video-posts] Loaded ${allPosts.length} videos, resolved ${userCache.size} users`,
+    );
+  } catch (err) {
+    console.error("[video-posts] loadPosts error:", err);
+    showToast("Failed to load videos — check console.", "error");
+    document.getElementById("videoGrid").innerHTML = `
+            <div style="grid-column:1/-1;text-align:center;padding:60px 20px;">
+                <div class="empty-state">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>Could not load videos.<br>
+                       <button onclick="location.reload()" style="color:var(--accent-l);background:none;border:none;cursor:pointer;text-decoration:underline;">Retry</button>
+                    </p>
+                </div>
+            </div>`;
+  }
+}
+
+// ── FILTER / SORT / SEARCH ─────────────────────────────────────
+
+function applyFilters() {
+  const term = document
+    .getElementById("searchInput")
+    .value.toLowerCase()
+    .trim();
+  const sortVal = document.getElementById("sortSelect").value;
+  const now = new Date();
+
+  // Time range
+  let posts = allPosts.filter((p) => {
+    const d = toDate(p.createdAt);
+    if (!d) return true;
+    if (currentTimeFilter === "today") {
+      return d >= new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    }
+    if (currentTimeFilter === "week") {
+      return d >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    }
+    return true;
+  });
+
+  // Search — uses resolved username from cache
+  if (term) {
+    posts = posts.filter((p) => {
+      const author = getAuthor(p);
+      return (
+        p.id.toLowerCase().includes(term) ||
+        author.username.toLowerCase().includes(term) ||
+        (p.text || "").toLowerCase().includes(term) ||
+        (p.userId || "").toLowerCase().includes(term)
+      );
+    });
+  }
+
+  // Sort
+  const [field, dir] = sortVal.split("-");
+  posts.sort((a, b) => {
+    let aV, bV;
+    if (field === "createdAt") {
+      aV = toDate(a.createdAt)?.getTime() || 0;
+      bV = toDate(b.createdAt)?.getTime() || 0;
+    } else if (field === "likeCount") {
+      aV = getLikeCount(a);
+      bV = getLikeCount(b);
+    } else if (field === "viewCount") {
+      aV = getViewCount(a);
+      bV = getViewCount(b);
     } else {
-        console.log("❌ No user logged in, redirecting...");
-        window.location.href = "../login/?view=login";
+      aV = a[field] || 0;
+      bV = b[field] || 0;
     }
-});
+    return dir === "desc" ? bV - aV : aV - bV;
+  });
 
-// ============================================
-// CHECK ADMIN STATUS
-// ============================================
-// Verify user has admin privileges
-
-// async function checkAdminStatus(uid) {
-//     try {
-//         // Check if admin document exists
-//         const adminDoc = await getDocs(query(collection(db, "admins"), where("userId", "==", uid)));
-        
-//         if (!adminDoc.empty) {
-//             console.log("✅ Admin verified via Firestore");
-//             return true;
-//         }
-        
-//         // Alternative: Check custom claims (if you use them)
-//         const tokenResult = await auth.currentUser.getIdTokenResult();
-//         if (tokenResult.claims.admin === true) {
-//             console.log("✅ Admin verified via custom claims");
-//             return true;
-//         }
-        
-//         return false;
-        
-//     } catch (error) {
-//         console.error("❌ Error checking admin status:", error);
-//         return false;
-//     }
-// }
-
-// ============================================
-// LOAD ALL VIDEOS
-// ============================================
-// Fetch all video posts from Firestore
-
-async function loadAllVideos() {
-    try {
-        console.log("📥 Loading all videos...");
-        showLoading();
-        
-        // Query all video-posts, ordered by newest first
-        const videosQuery = query(
-            collection(db, "video-posts"),
-            orderBy("createdAt", "desc")
-        );
-        
-        const snapshot = await getDocs(videosQuery);
-        
-        console.log(`✅ Loaded ${snapshot.docs.length} videos`);
-        
-        // Store all videos
-        allVideos = snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        }));
-        
-        // Calculate and display statistics
-        calculateStatistics();
-        
-        // Display videos
-        filteredVideos = [...allVideos];
-        displayVideos(filteredVideos);
-        
-        hideLoading();
-        
-    } catch (error) {
-        console.error("❌ Error loading videos:", error);
-        hideLoading();
-        showError("Failed to load videos");
-    }
+  filteredPosts = posts;
+  currentPage = 1;
 }
 
-// ============================================
-// CALCULATE STATISTICS
-// ============================================
-// Calculate total, today, week, and storage stats
+// ── STATS ─────────────────────────────────────────────────────
 
-function calculateStatistics() {
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    let todayCount = 0;
-    let weekCount = 0;
-    let totalStorage = 0;
-    
-    allVideos.forEach(video => {
-        // Convert Firestore timestamp to Date
-        const createdAt = video.createdAt?.toDate ? video.createdAt.toDate() : new Date(video.createdAt);
-        
-        // Count today's videos
-        if (createdAt >= todayStart) {
-            todayCount++;
-        }
-        
-        // Count this week's videos
-        if (createdAt >= weekStart) {
-            weekCount++;
-        }
-        
-        // Calculate total storage
-        if (video.fileSize) {
-            totalStorage += video.fileSize;
-        }
-    });
-    
-    // Update statistics display
-    document.getElementById('totalVideos').textContent = allVideos.length;
-    document.getElementById('todayVideos').textContent = todayCount;
-    document.getElementById('weekVideos').textContent = weekCount;
-    document.getElementById('storageUsed').textContent = formatFileSize(totalStorage);
-    
-    console.log(`📊 Statistics: Total: ${allVideos.length}, Today: ${todayCount}, Week: ${weekCount}, Storage: ${formatFileSize(totalStorage)}`);
+function renderStats() {
+  const total = allPosts.length;
+  const likes = allPosts.reduce((s, p) => s + getLikeCount(p), 0);
+  const views = allPosts.reduce((s, p) => s + getViewCount(p), 0);
+  const comments = allPosts.reduce((s, p) => s + (p.commentCount || 0), 0);
+  const storage = allPosts.reduce((s, p) => s + (p.fileSize || 0), 0);
+  const users = new Set(allPosts.filter((p) => p.userId).map((p) => p.userId))
+    .size;
+  const today = allPosts.filter((p) => {
+    const d = toDate(p.createdAt);
+    return d && d.toDateString() === new Date().toDateString();
+  }).length;
+
+  setText("statTotal", total);
+  setText("statToday", today);
+  setText("statLikes", fmtCount(likes));
+  setText("statViews", fmtCount(views));
+  setText("statComments", fmtCount(comments));
+  setText("statStorage", fmtBytes(storage));
+  setText("statUsers", users);
 }
 
-// ============================================
-// DISPLAY VIDEOS
-// ============================================
-// Render video cards to the page
+// ── VIEW MODE TOGGLE ──────────────────────────────────────────
 
-function displayVideos(videos) {
-    // Clear container
-    videoList.innerHTML = '';
-    
-    // Check if videos exist
-    if (videos.length === 0) {
-        noVideosMessage.style.display = 'block';
-        return;
-    }
-    
-    noVideosMessage.style.display = 'none';
-    
-    // Create video cards
-    videos.forEach(video => {
-        const videoCard = createVideoCard(video);
-        videoList.appendChild(videoCard);
-    });
-    
-    console.log(`📺 Displayed ${videos.length} videos`);
+/**
+ * Master render dispatcher — calls the right renderer based on currentView.
+ */
+function render() {
+  if (currentView === "grid") {
+    document.getElementById("videoGrid").style.display = "";
+    document.getElementById("videoTableWrap").style.display = "none";
+    renderGrid();
+  } else {
+    document.getElementById("videoGrid").style.display = "none";
+    document.getElementById("videoTableWrap").style.display = "";
+    renderTableView();
+  }
 }
 
-// ============================================
-// CREATE VIDEO CARD
-// ============================================
-// Build HTML for a single video card
+function setView(mode) {
+  currentView = mode;
 
-function createVideoCard(video) {
-    const card = document.createElement('div');
-    card.className = 'video-card';
-    card.dataset.videoId = video.id;
-    
-    // Format date
-    const createdAt = video.createdAt?.toDate ? video.createdAt.toDate() : new Date(video.createdAt);
-    const dateStr = formatDate(createdAt);
-    
-    // Build HTML
-    card.innerHTML = `
-        <div class="video-thumbnail">
-            <video preload="metadata" muted>
-                <source src="${video.videoUrl}#t=0.5" type="video/mp4">
-            </video>
-            <div class="play-overlay">
-                <i class="fas fa-play"></i>
+  document.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.view === mode);
+  });
+
+  render();
+}
+
+// ── GRID RENDERER ─────────────────────────────────────────────
+
+function renderGrid() {
+  const grid = document.getElementById("videoGrid");
+  const empty = document.getElementById("emptyState");
+  const pagWrap = document.getElementById("paginationWrap");
+
+  if (!filteredPosts.length) {
+    grid.innerHTML = "";
+    empty.style.display = "block";
+    pagWrap.style.display = "none";
+    return;
+  }
+
+  empty.style.display = "none";
+  pagWrap.style.display = "flex";
+
+  const start = (currentPage - 1) * POSTS_PER_PAGE;
+  const end = start + POSTS_PER_PAGE;
+  const page = filteredPosts.slice(start, end);
+
+  grid.innerHTML = page.map(buildVideoCard).join("");
+
+  updatePagination(filteredPosts.length, start, end);
+}
+
+function buildVideoCard(post) {
+  const d = toDate(post.createdAt);
+  const date = d ? fmtRelDate(d) : "—";
+  const dur = fmtDuration(post.duration || 0);
+  const views = getViewCount(post);
+  const likes = getLikeCount(post);
+  const author = getAuthor(post);
+  const caption = escHtml((post.text || "").substring(0, 80));
+
+  return `
+    <div class="video-card" data-id="${post.id}">
+        <div class="video-thumb">
+            <video src="${post.videoUrl}#t=0.5" preload="metadata" muted playsinline></video>
+            <div class="video-thumb__overlay">
+                <div class="video-thumb__play"><i class="fas fa-play"></i></div>
+            </div>
+            <div class="video-thumb__dur">${dur}</div>
+        </div>
+
+        <div class="video-card__body">
+            <div class="video-card__user">
+                <img src="${author.profilePic}" onerror="this.src='${defaultAvatar()}'" alt="">
+                <div>
+                    <div class="video-card__username">@${escHtml(author.username)}</div>
+                    <div class="video-card__date">${date}</div>
+                </div>
+            </div>
+            ${caption ? `<div class="video-card__caption">${caption}</div>` : ""}
+            <div class="video-card__stats">
+                <span class="video-card__stat"><i class="fas fa-heart"></i> ${fmtCount(likes)}</span>
+                <span class="video-card__stat"><i class="fas fa-eye"></i> ${fmtCount(views)}</span>
+                <span class="video-card__stat"><i class="fas fa-comment"></i> ${fmtCount(post.commentCount || 0)}</span>
+                <span class="video-card__stat"><i class="fas fa-file"></i> ${fmtBytes(post.fileSize || 0)}</span>
             </div>
         </div>
-        
-        <div class="video-card-info">
-            <div class="video-card-header">
-                <img 
-                    src="${video.userProfilePic || 'https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3'}" 
-                    alt="User avatar" 
-                    class="user-avatar"
-                >
-                <div class="user-info">
-                    <div class="username">@${video.username || 'User'}</div>
-                    <div class="upload-date">${dateStr}</div>
-                </div>
-            </div>
-            
-            ${video.text ? `<div class="video-caption">${escapeHtml(video.text)}</div>` : ''}
-            
-            <div class="video-stats">
-                <div class="stat-item">
-                    <i class="fas fa-heart"></i>
-                    <span>${formatCount(video.likeCount || 0)}</span>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-comment"></i>
-                    <span>${formatCount(video.commentCount || 0)}</span>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-clock"></i>
-                    <span>${video.duration || 0}s</span>
-                </div>
-                <div class="stat-item">
-                    <i class="fas fa-file"></i>
-                    <span>${formatFileSize(video.fileSize || 0)}</span>
-                </div>
-            </div>
+
+        <div class="video-card__actions">
+            <button class="btn btn-primary" data-action="preview" data-id="${post.id}">
+                <i class="fas fa-eye"></i> Preview
+            </button>
+            <button class="btn btn-danger" data-action="delete" data-id="${post.id}">
+                <i class="fas fa-trash"></i>
+            </button>
         </div>
-    `;
-    
-    // Add click handler to open preview modal
-    card.addEventListener('click', () => {
-        openPreviewModal(video);
+    </div>`;
+}
+
+// ── TABLE RENDERER ────────────────────────────────────────────
+
+function renderTableView() {
+  const tbody = document.getElementById("videoTableBody");
+  const empty = document.getElementById("emptyState");
+  const pagWrap = document.getElementById("paginationWrap");
+
+  if (!filteredPosts.length) {
+    tbody.innerHTML = "";
+    empty.style.display = "block";
+    pagWrap.style.display = "none";
+    return;
+  }
+
+  empty.style.display = "none";
+  pagWrap.style.display = "flex";
+
+  const start = (currentPage - 1) * POSTS_PER_PAGE;
+  const end = start + POSTS_PER_PAGE;
+  const page = filteredPosts.slice(start, end);
+
+  tbody.innerHTML = page
+    .map((p) => {
+      const d = toDate(p.createdAt);
+      const author = getAuthor(p);
+      const views = getViewCount(p);
+      const likes = getLikeCount(p);
+      const dur = fmtDuration(p.duration || 0);
+      const hasVid = p.videoUrl?.trim();
+      const preview = escHtml((p.text || "").substring(0, 70));
+
+      return `
+        <tr>
+            <td>
+                <div class="flex-center gap-8">
+                    <img src="${author.profilePic}" class="avatar" style="width:32px;height:32px;"
+                         onerror="this.src='${defaultAvatar()}'">
+                    <div>
+                        <div style="font-size:.85rem;font-weight:600;">@${escHtml(author.username)}</div>
+                        <div class="text-xs text-faint mono">${p.userId?.substring(0, 10) || "—"}…</div>
+                    </div>
+                </div>
+            </td>
+            <td style="max-width:240px;">
+                ${
+                  preview
+                    ? `<p class="post-preview-text">${preview}${(p.text?.length || 0) > 70 ? "…" : ""}</p>`
+                    : `<em class="text-faint text-xs">[No caption]</em>`
+                }
+            </td>
+            <td class="text-sm text-muted">
+                ${d ? d.toLocaleDateString() : "—"}<br>
+                <span class="text-xs text-faint">
+                    ${d ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""}
+                </span>
+            </td>
+            <td class="text-sm text-muted">${dur}</td>
+            <td>
+                <span class="${likes > 0 ? "badge badge-new" : "text-faint text-sm"}">
+                    <i class="fas fa-heart"></i> ${fmtCount(likes)}
+                </span>
+            </td>
+            <td class="text-sm">
+                <span class="${views > 0 ? "" : "text-faint"}">
+                    <i class="fas fa-eye" style="color:var(--accent);margin-right:4px;font-size:.75rem;"></i>${fmtCount(views)}
+                </span>
+            </td>
+            <td class="text-sm text-muted">${fmtCount(p.commentCount || 0)}</td>
+            <td class="text-sm text-muted">${fmtBytes(p.fileSize || 0)}</td>
+            <td>
+                <div class="flex-center gap-8">
+                    <button class="btn btn-icon" title="Preview"
+                            data-action="preview" data-id="${p.id}">
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="btn btn-icon btn-danger" title="Delete"
+                            data-action="delete" data-id="${p.id}">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </td>
+        </tr>`;
+    })
+    .join("");
+
+  updatePagination(filteredPosts.length, start, end);
+
+  // Attach delegation to table rows too
+  document
+    .getElementById("videoTableBody")
+    .querySelectorAll("[data-action]")
+    .forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const action = btn.dataset.action;
+        if (action === "preview") openPlayer(btn.dataset.id);
+        if (action === "delete") deletePost(btn.dataset.id, btn);
+      });
     });
-    
-    return card;
 }
 
-// ============================================
-// OPEN PREVIEW MODAL
-// ============================================
-// Show video preview with details
+// ── PAGINATION ────────────────────────────────────────────────
 
-function openPreviewModal(video) {
-    selectedVideoData = video;
-    
-    // Set video source
-    modalVideo.src = video.videoUrl;
-    
-    // Fill in details
-    document.getElementById('modalUsername').textContent = `@${video.username || 'User'}`;
-    document.getElementById('modalVideoId').textContent = video.id;
-    
-    // Format date
-    const createdAt = video.createdAt?.toDate ? video.createdAt.toDate() : new Date(video.createdAt);
-    document.getElementById('modalDate').textContent = formatFullDate(createdAt);
-    
-    document.getElementById('modalDuration').textContent = `${video.duration || 0} seconds`;
-    document.getElementById('modalSize').textContent = formatFileSize(video.fileSize || 0);
-    document.getElementById('modalLikes').textContent = formatCount(video.likeCount || 0);
-    document.getElementById('modalComments').textContent = formatCount(video.commentCount || 0);
-    
-    // Show/hide caption
-    const captionRow = document.getElementById('captionRow');
-    if (video.text && video.text.trim() !== '') {
-        captionRow.style.display = 'flex';
-        document.getElementById('modalCaption').textContent = video.text;
-    } else {
-        captionRow.style.display = 'none';
-    }
-    
-    // Show modal
-    previewModal.classList.add('active');
-    
-    console.log("👁️ Opened preview for video:", video.id);
+function updatePagination(total, start, end) {
+  const pages = Math.ceil(total / POSTS_PER_PAGE);
+  setText("pagFrom", total ? start + 1 : 0);
+  setText("pagTo", Math.min(end, total));
+  setText("pagTotal", total);
+  setText("pagInfo", `Page ${currentPage} / ${pages}`);
+  document.getElementById("prevBtn").disabled = currentPage === 1;
+  document.getElementById("nextBtn").disabled = end >= total;
 }
 
-// ============================================
-// CLOSE PREVIEW MODAL
-// ============================================
+// ── SKELETON ─────────────────────────────────────────────────
 
-function closePreviewModal() {
-    previewModal.classList.remove('active');
-    modalVideo.pause();
-    modalVideo.src = '';
-    selectedVideoData = null;
+function buildSkeletonGrid(rows = 10) {
+  return Array.from(
+    { length: rows },
+    () => `
+        <div class="video-card" style="pointer-events:none;">
+            <div class="video-thumb skeleton" style="position:relative;padding-top:133%;"></div>
+            <div class="video-card__body">
+                <div class="skeleton" style="height:14px;width:70%;margin-bottom:8px;border-radius:4px;"></div>
+                <div class="skeleton" style="height:12px;width:50%;border-radius:4px;"></div>
+            </div>
+        </div>`,
+  ).join("");
 }
 
-// ============================================
-// DELETE VIDEO
-// ============================================
-// Delete video from Firestore AND Firebase Storage
+// ── VIDEO PLAYER MODAL ────────────────────────────────────────
 
-async function deleteVideo(video) {
-    try {
-        console.log("🗑️ Deleting video:", video.id);
-        
-        // STEP 1: Delete from Firestore
-        await deleteDoc(doc(db, "video-posts", video.id));
-        console.log("✅ Deleted from Firestore");
-        
-        // STEP 2: Delete from Storage
-        // Extract storage path from video URL
-        const storagePath = extractStoragePath(video.videoUrl);
-        
-        if (storagePath) {
-            try {
-                const storageRef = ref(storage, storagePath);
-                await deleteObject(storageRef);
-                console.log("✅ Deleted from Storage:", storagePath);
-            } catch (storageError) {
-                console.error("⚠️ Error deleting from Storage:", storageError);
-                // Continue even if storage deletion fails
+function openPlayer(postId) {
+  const post = allPosts.find((p) => p.id === postId);
+  if (!post) return;
+
+  activePost = post;
+
+  const modal = document.getElementById("playerModal");
+  const video = document.getElementById("playerVideo");
+  const author = getAuthor(post);
+  const views = getViewCount(post);
+  const likes = getLikeCount(post);
+  const d = toDate(post.createdAt);
+
+  video.src = post.videoUrl;
+  video.load();
+
+  const rows = [
+    ["Post ID", post.id, true],
+    ["User ID", post.userId || "—", true],
+    ["Username", "@" + author.username, false],
+    ["Uploaded", d ? fmtFullDate(d) : "—", false],
+    ["Duration", fmtDuration(post.duration || 0), false],
+    ["File size", fmtBytes(post.fileSize || 0), false],
+    ["Likes", fmtCount(likes), false],
+    ["Views", fmtCount(views), false],
+    ["Comments", fmtCount(post.commentCount || 0), false],
+  ];
+
+  document.getElementById("playerDetails").innerHTML = `
+        <div class="player-detail-group">
+            <div class="player-detail-group__title">Post Info</div>
+            ${rows
+              .map(
+                ([label, val, mono]) => `
+                <div class="player-detail-row">
+                    <span class="player-detail-row__label">${label}</span>
+                    <span class="player-detail-row__value${mono ? " mono" : ""}">${escHtml(String(val))}</span>
+                </div>
+            `,
+              )
+              .join("")}
+            ${
+              post.text
+                ? `
+                <div class="player-detail-row" style="flex-direction:column;align-items:flex-start;gap:6px;">
+                    <span class="player-detail-row__label">Caption</span>
+                    <span class="player-detail-row__value" style="text-align:left;font-weight:400;line-height:1.5;">
+                        ${escHtml(post.text)}
+                    </span>
+                </div>
+            `
+                : ""
             }
-        } else {
-            console.log("⚠️ Could not extract storage path from URL");
-        }
-        
-        // STEP 3: Remove from local arrays
-        allVideos = allVideos.filter(v => v.id !== video.id);
-        filteredVideos = filteredVideos.filter(v => v.id !== video.id);
-        
-        // STEP 4: Update UI
-        calculateStatistics();
-        displayVideos(filteredVideos);
-        
-        // STEP 5: Close modals
-        closePreviewModal();
-        closeConfirmModal();
-        
-        // STEP 6: Show success message
-        showSuccessMessage("Video deleted successfully!");
-        
-        console.log("✅ Video deletion complete");
-        
-    } catch (error) {
-        console.error("❌ Error deleting video:", error);
-        alert(`Failed to delete video: ${error.message}`);
-    }
-}
+        </div>
 
-// ============================================
-// EXTRACT STORAGE PATH FROM URL
-// ============================================
-// Convert Firebase Storage URL to storage path
-
-function extractStoragePath(url) {
-    try {
-        // Firebase Storage URL format:
-        // https://firebasestorage.googleapis.com/v0/b/{bucket}/o/{path}?alt=media&token={token}
-        
-        // Extract the path between /o/ and ?alt=
-        const matches = url.match(/\/o\/(.+?)\?alt=/);
-        
-        if (matches && matches[1]) {
-            // Decode URL-encoded path
-            const decodedPath = decodeURIComponent(matches[1]);
-            console.log("📂 Extracted storage path:", decodedPath);
-            return decodedPath;
-        }
-        
-        return null;
-        
-    } catch (error) {
-        console.error("❌ Error extracting storage path:", error);
-        return null;
-    }
-}
-
-// ============================================
-// FILTER VIDEOS
-// ============================================
-// Filter by time period (all, today, week)
-
-function filterVideos(filterType) {
-    currentFilter = filterType;
-    
-    const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    
-    if (filterType === 'all') {
-        filteredVideos = [...allVideos];
-    } else if (filterType === 'today') {
-        filteredVideos = allVideos.filter(video => {
-            const createdAt = video.createdAt?.toDate ? video.createdAt.toDate() : new Date(video.createdAt);
-            return createdAt >= todayStart;
-        });
-    } else if (filterType === 'week') {
-        filteredVideos = allVideos.filter(video => {
-            const createdAt = video.createdAt?.toDate ? video.createdAt.toDate() : new Date(video.createdAt);
-            return createdAt >= weekStart;
-        });
-    }
-    
-    // Apply search if there's a search term
-    const searchTerm = searchInput.value.trim();
-    if (searchTerm !== '') {
-        searchVideos(searchTerm);
-    } else {
-        displayVideos(filteredVideos);
-    }
-    
-    console.log(`🔍 Filtered to ${filteredVideos.length} videos (${filterType})`);
-}
-
-// ============================================
-// SEARCH VIDEOS
-// ============================================
-// Search by username or video ID
-
-function searchVideos(searchTerm) {
-    const term = searchTerm.toLowerCase();
-    
-    filteredVideos = filteredVideos.filter(video => {
-        const username = (video.username || '').toLowerCase();
-        const videoId = video.id.toLowerCase();
-        const caption = (video.text || '').toLowerCase();
-        
-        return username.includes(term) || 
-               videoId.includes(term) || 
-               caption.includes(term);
-    });
-    
-    displayVideos(filteredVideos);
-    
-    console.log(`🔍 Search results: ${filteredVideos.length} videos`);
-}
-
-// ============================================
-// EVENT LISTENERS
-// ============================================
-
-// Back button
-backBtn.addEventListener('click', () => {
-    window.history.back();
-});
-
-// Refresh button
-refreshBtn.addEventListener('click', async () => {
-    refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Refreshing...';
-    refreshBtn.disabled = true;
-    
-    await loadAllVideos();
-    
-    refreshBtn.innerHTML = '<i class="fas fa-sync-alt"></i> Refresh';
-    refreshBtn.disabled = false;
-});
-
-// Filter buttons
-filterButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-        // Update active state
-        filterButtons.forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        
-        // Apply filter
-        const filterType = btn.dataset.filter;
-        filterVideos(filterType);
-    });
-});
-
-// Search input
-let searchTimeout;
-searchInput.addEventListener('input', () => {
-    clearTimeout(searchTimeout);
-    
-    searchTimeout = setTimeout(() => {
-        // Re-filter based on current filter
-        filterVideos(currentFilter);
-    }, 300);
-});
-
-// Modal close buttons
-closeModal.addEventListener('click', closePreviewModal);
-cancelBtn.addEventListener('click', closePreviewModal);
-
-// Click outside modal to close
-previewModal.addEventListener('click', (e) => {
-    if (e.target === previewModal) {
-        closePreviewModal();
-    }
-});
-
-confirmModal.addEventListener('click', (e) => {
-    if (e.target === confirmModal) {
-        closeConfirmModal();
-    }
-});
-
-// Delete button - open confirmation
-deleteVideoBtn.addEventListener('click', () => {
-    if (selectedVideoData) {
-        confirmModal.classList.add('active');
-    }
-});
-
-// Confirm delete
-confirmDeleteBtn.addEventListener('click', () => {
-    if (selectedVideoData) {
-        deleteVideo(selectedVideoData);
-    }
-});
-
-// Cancel delete
-confirmCancelBtn.addEventListener('click', closeConfirmModal);
-
-function closeConfirmModal() {
-    confirmModal.classList.remove('active');
-}
-
-// ============================================
-// HELPER FUNCTIONS
-// ============================================
-
-// Format file size
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    
-    const units = ['B', 'KB', 'MB', 'GB'];
-    const k = 1024;
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + units[i];
-}
-
-// Format count (1000 -> 1K)
-function formatCount(count) {
-    if (count >= 1000000) {
-        return (count / 1000000).toFixed(1) + 'M';
-    }
-    if (count >= 1000) {
-        return (count / 1000).toFixed(1) + 'K';
-    }
-    return count.toString();
-}
-
-// Format date (short)
-function formatDate(date) {
-    const now = new Date();
-    const diff = now - date;
-    const seconds = Math.floor(diff / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-    
-    if (days > 7) {
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } else if (days > 0) {
-        return `${days}d ago`;
-    } else if (hours > 0) {
-        return `${hours}h ago`;
-    } else if (minutes > 0) {
-        return `${minutes}m ago`;
-    } else {
-        return 'Just now';
-    }
-}
-
-// Format date (full)
-function formatFullDate(date) {
-    return date.toLocaleDateString('en-US', { 
-        month: 'long', 
-        day: 'numeric', 
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-    });
-}
-
-// Escape HTML
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
-
-// Show loading
-function showLoading() {
-    loadingContainer.style.display = 'block';
-    videoList.style.display = 'none';
-    noVideosMessage.style.display = 'none';
-}
-
-// Hide loading
-function hideLoading() {
-    loadingContainer.style.display = 'none';
-    videoList.style.display = 'grid';
-}
-
-// Show error
-function showError(message) {
-    alert(`❌ ${message}`);
-}
-
-// Show success message
-function showSuccessMessage(message) {
-    // Create temporary success toast
-    const toast = document.createElement('div');
-    toast.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #2ed573;
-        color: white;
-        padding: 15px 24px;
-        border-radius: 8px;
-        font-weight: 600;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-        animation: slideIn 0.3s ease;
+        <!-- Author card with live-fetched pic -->
+        <div class="player-detail-group">
+            <div class="player-detail-group__title">Author</div>
+            <div class="player-detail-row" style="gap:12px;padding:14px;">
+                <img src="${author.profilePic}"
+                     style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;"
+                     onerror="this.src='${defaultAvatar()}'">
+                <div>
+                    <div style="font-weight:600;font-size:.85rem;">@${escHtml(author.username)}</div>
+                    <div class="text-xs text-faint mono">${post.userId || "—"}</div>
+                </div>
+            </div>
+        </div>
     `;
-    toast.textContent = `✅ ${message}`;
-    
-    document.body.appendChild(toast);
-    
-    // Remove after 3 seconds
-    setTimeout(() => {
-        toast.style.animation = 'slideOut 0.3s ease';
-        setTimeout(() => toast.remove(), 300);
-    }, 3000);
+
+  modal.classList.add("open");
 }
 
-// Add animations
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes slideIn {
-        from {
-            transform: translateX(400px);
-            opacity: 0;
-        }
-        to {
-            transform: translateX(0);
-            opacity: 1;
-        }
-    }
-    @keyframes slideOut {
-        from {
-            transform: translateX(0);
-            opacity: 1;
-        }
-        to {
-            transform: translateX(400px);
-            opacity: 0;
-        }
-    }
-`;
-document.head.appendChild(style);
+function closePlayer() {
+  const modal = document.getElementById("playerModal");
+  const video = document.getElementById("playerVideo");
+  modal.classList.remove("open");
+  video.pause();
+  video.src = "";
+  activePost = null;
+}
 
-console.log("✅ Admin Video Panel loaded!");
+// ── DELETE ────────────────────────────────────────────────────
+
+async function deletePost(postId, triggerBtn = null) {
+  const post = allPosts.find((p) => p.id === postId);
+  if (!post) {
+    showToast("Post not found.", "error");
+    return;
+  }
+
+  const confirmed = await showConfirm({
+    title: "Delete this video?",
+    message:
+      "This will permanently remove the video from Firestore and Cloudinary. This cannot be undone.",
+    confirmText: "Yes, Delete",
+    intent: "danger",
+  });
+  if (!confirmed) return;
+
+  const restoreBtn = triggerBtn ? setButtonLoading(triggerBtn, "") : () => {};
+  showLoading("Deleting video…");
+
+  try {
+    // Step 1: Cloudinary (best-effort)
+    if (post.cloudinaryId) {
+      try {
+        await deleteCloudinaryVideo(post.cloudinaryId);
+        console.log(
+          "[video-posts] Cloudinary asset deleted:",
+          post.cloudinaryId,
+        );
+      } catch (cloudErr) {
+        console.warn(
+          "[video-posts] Cloudinary delete failed (continuing):",
+          cloudErr.message,
+        );
+      }
+    }
+
+    let batch = writeBatch(db);
+    let writes = 0;
+
+    async function commitIfNeeded() {
+      if (writes >= 490) {
+        await batch.commit();
+        batch = writeBatch(db);
+        writes = 0;
+      }
+    }
+
+    // Step 2: Decrement owner's likesCount, then drain likes + viewers subcollections
+    const likeCount = getLikeCount(post);
+    const postOwnerId = post.userId;
+
+    if (likeCount > 0 && postOwnerId) {
+      batch.update(doc(db, "users", postOwnerId), {
+        likesCount: increment(-likeCount),
+      });
+      writes++;
+    }
+
+    for (const colName of ["likes", "views"]) {
+      const colRef = collection(db, "video-posts", postId, colName);
+      let lastDoc = null;
+      while (true) {
+        const q = lastDoc
+          ? query(colRef, startAfter(lastDoc), limit(400))
+          : query(colRef, limit(400));
+        const snap = await getDocs(q);
+        if (snap.empty) break;
+        for (const d of snap.docs) {
+          batch.delete(d.ref);
+          writes++;
+          await commitIfNeeded();
+        }
+        lastDoc = snap.docs[snap.docs.length - 1];
+        if (snap.docs.length < 400) break;
+      }
+      console.log(`[video-posts] Drained ${colName} for ${postId}`);
+    }
+
+    // Step 3: Comments (track per-commenter counts)
+    const commentsRef = collection(db, "video-posts", postId, "comments");
+    const commentUserCounts = new Map();
+    let lastCommentDoc = null;
+
+    while (true) {
+      const q = lastCommentDoc
+        ? query(commentsRef, startAfter(lastCommentDoc), limit(400))
+        : query(commentsRef, limit(400));
+      const snap = await getDocs(q);
+      if (snap.empty) break;
+      for (const commentDoc of snap.docs) {
+        const uid = commentDoc.data().userId;
+        if (uid)
+          commentUserCounts.set(uid, (commentUserCounts.get(uid) || 0) + 1);
+        batch.delete(commentDoc.ref);
+        writes++;
+        await commitIfNeeded();
+      }
+      lastCommentDoc = snap.docs[snap.docs.length - 1];
+      if (snap.docs.length < 400) break;
+    }
+
+    for (const [uid, count] of commentUserCounts) {
+      batch.update(doc(db, "users", uid), { commentsCount: increment(-count) });
+      writes++;
+      await commitIfNeeded();
+    }
+    console.log(
+      `[video-posts] Comment cleanup done for ${commentUserCounts.size} users`,
+    );
+
+    // Step 4: Delete the post document itself
+    batch.delete(doc(db, "video-posts", postId));
+    writes++;
+
+    if (writes > 0) await batch.commit();
+
+    // Update local state
+    allPosts = allPosts.filter((p) => p.id !== postId);
+    filteredPosts = filteredPosts.filter((p) => p.id !== postId);
+
+    const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+
+    renderStats();
+    render();
+
+    if (activePost?.id === postId) closePlayer();
+
+    showToast("Video deleted successfully.", "success");
+  } catch (err) {
+    console.error("[video-posts] deletePost error:", err);
+    showToast("Failed to delete: " + err.message, "error");
+  } finally {
+    hideLoading();
+    restoreBtn();
+  }
+}
+
+// ── EVENT LISTENERS ───────────────────────────────────────────
+
+function setupEventListeners() {
+  // Search
+  document.getElementById("searchInput").addEventListener("input", () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      applyFilters();
+      render();
+    }, 300);
+  });
+
+  // Sort
+  document.getElementById("sortSelect").addEventListener("change", () => {
+    applyFilters();
+    render();
+  });
+
+  // Time filter chips
+  document.querySelectorAll("[data-time]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      document
+        .querySelectorAll("[data-time]")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      currentTimeFilter = btn.dataset.time;
+      applyFilters();
+      render();
+    });
+  });
+
+  // View toggle (grid / table)
+  document.querySelectorAll("[data-view]").forEach((btn) => {
+    btn.addEventListener("click", () => setView(btn.dataset.view));
+  });
+
+  // Refresh
+  document
+    .getElementById("refreshBtn")
+    .addEventListener("click", async function () {
+      const restore = setButtonLoading(this, "Refreshing…");
+      try {
+        await loadPosts();
+      } finally {
+        restore();
+      }
+    });
+
+  // Grid click delegation (preview + delete)
+  document.getElementById("videoGrid").addEventListener("click", (e) => {
+    const previewBtn = e.target.closest('[data-action="preview"]');
+    const deleteBtn = e.target.closest('[data-action="delete"]');
+    const card = e.target.closest(".video-card");
+
+    if (previewBtn) {
+      e.stopPropagation();
+      openPlayer(previewBtn.dataset.id);
+    } else if (deleteBtn) {
+      e.stopPropagation();
+      deletePost(deleteBtn.dataset.id, deleteBtn);
+    } else if (card && !e.target.closest(".video-card__actions")) {
+      openPlayer(card.dataset.id);
+    }
+  });
+
+  // Player close
+  document
+    .getElementById("closePlayerBtn")
+    .addEventListener("click", closePlayer);
+  document.getElementById("playerModal").addEventListener("click", (e) => {
+    if (e.target === document.getElementById("playerModal")) closePlayer();
+  });
+
+  // Player delete button
+  document
+    .getElementById("playerDeleteBtn")
+    .addEventListener("click", async function () {
+      if (!activePost) return;
+      const restore = setButtonLoading(this, "Deleting…");
+      await deletePost(activePost.id, null);
+      restore();
+    });
+
+  // Pagination
+  document.getElementById("prevBtn").addEventListener("click", () => {
+    currentPage--;
+    render();
+    scrollTo({ top: 0, behavior: "smooth" });
+  });
+  document.getElementById("nextBtn").addEventListener("click", () => {
+    currentPage++;
+    render();
+    scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  // Back button
+  document
+    .getElementById("backBtn")
+    .addEventListener("click", () => history.back());
+
+  // ESC closes player
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closePlayer();
+  });
+}
+
+// ── UTILITIES ─────────────────────────────────────────────────
+
+function setText(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+
+function fmtRelDate(date) {
+  if (!date) return "—";
+  const diff = Date.now() - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function fmtFullDate(date) {
+  if (!date) return "—";
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function fmtDuration(secs) {
+  if (!secs) return "0:00";
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
+function fmtCount(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + "M";
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
+  return String(n);
+}
+
+function fmtBytes(bytes) {
+  if (!bytes) return "0 B";
+  const units = ["B", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return (bytes / Math.pow(1024, i)).toFixed(1) + " " + units[i];
+}
+
+function escHtml(str) {
+  const d = document.createElement("div");
+  d.textContent = str;
+  return d.innerHTML;
+}
+
+function defaultAvatar() {
+  return "https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3";
+}
+
+console.log("✅ [video-posts] module loaded");

@@ -1,210 +1,493 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JOYIN Admin - Create Account</title>
-    <link rel="stylesheet" href="css/admin.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>JOYIN Admin — Create Account</title>
+    <link rel="stylesheet" href="css/admin.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="icon" type="image/x-icon" href="/J _ A192.png" />
+    <link rel="manifest" href="/admin-manifest.json" />
+    <meta name="theme-color" content="#5b53f2" />
+    <script src="/admin-pwa-install.js"></script>
 
+    <style>
+      /* Reuse blob animation from login */
+      .blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.1;
+        pointer-events: none;
+        animation: blobFloat 18s ease-in-out infinite;
+      }
+      .blob-1 {
+        width: 350px;
+        height: 350px;
+        background: var(--accent);
+        top: -140px;
+        right: -60px;
+      }
+      .blob-2 {
+        width: 220px;
+        height: 220px;
+        background: #7b74f5;
+        bottom: -80px;
+        left: 0;
+        animation-delay: -7s;
+      }
+      @keyframes blobFloat {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
+        }
+        33% {
+          transform: translate(15px, 25px) scale(1.05);
+        }
+        66% {
+          transform: translate(-12px, 12px) scale(0.95);
+        }
+      }
 
-    <link rel="icon" type="image/x-icon" href="/J _ A192.png">
+      /* Password strength bar */
+      .strength-bar {
+        height: 4px;
+        border-radius: 4px;
+        background: var(--surface-3);
+        margin-top: 8px;
+        overflow: hidden;
+      }
+      .strength-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition:
+          width 0.35s ease,
+          background 0.35s ease;
+        width: 0%;
+      }
+      .strength-label {
+        font-size: 0.72rem;
+        margin-top: 5px;
+        transition: color 0.2s;
+      }
 
-    <link rel="manifest" href="/admin-manifest.json">
-<meta name="theme-color" content="#5b53f2">
-<script src="/admin-pwa-install.js"></script>
-</head>
-<body>
-    <div class="login-container">
-        <div class="login-card" style="max-width: 450px;">
-            <div class="login-logo">
-                <h1>JOYIN<span>Admin</span></h1>
-                <p style="color: var(--text-secondary); margin-top: 8px;">Create Admin Account</p>
-            </div>
-            
-            <form id="signupForm">
-                <div class="form-group">
-                    <label for="username"><i class="fas fa-user"></i> Admin Username</label>
-                    <input type="text" id="username" placeholder="e.g., admin_john" required minlength="3">
-                </div>
-                
-                <div class="form-group">
-                    <label for="email"><i class="fas fa-envelope"></i> Admin Email</label>
-                    <input type="email" id="email" placeholder="admin@joyin.com" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password"><i class="fas fa-lock"></i> Password</label>
-                    <input type="password" id="password" placeholder="••••••••" required minlength="6">
-                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
-                        Minimum 6 characters
-                    </small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirmPassword"><i class="fas fa-lock"></i> Confirm Password</label>
-                    <input type="password" id="confirmPassword" placeholder="••••••••" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="adminKey"><i class="fas fa-key"></i> Admin Secret Key</label>
-                    <input type="password" id="adminKey" placeholder="Enter admin key" required>
-                    <small style="color: var(--text-secondary); display: block; margin-top: 5px;">
-                        Required for first-time setup
-                    </small>
-                </div>
-                
-                <button type="submit" class="login-btn">
-                    <i class="fas fa-user-plus"></i> Create Admin Account
-                </button>
-                
-                <div id="errorMessage" class="error-message" style="display: none;"></div>
-                <div id="successMessage" class="error-message" style="display: none; color: var(--success);"></div>
-            </form>
-            
-            <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--card-border);">
-                <p style="color: var(--text-secondary);">
-                    Already have an account? 
-                    <a href="index.html" style="color: var(--primary); text-decoration: none; font-weight: 600;">
-                        <i class="fas fa-sign-in-alt"></i> Sign In
-                    </a>
-                </p>
-                <p style="color: var(--warning); font-size: 12px; margin-top: 15px;">
-                    <i class="fas fa-exclamation-triangle"></i> 
-                    Admin accounts have full access to all user data and controls.
-                </p>
-            </div>
+      /* Input with icon prefix */
+      .input-wrap {
+        position: relative;
+      }
+      .input-wrap .form-input {
+        padding-right: 44px;
+      }
+      .toggle-pw {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-3);
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 4px;
+        transition: color 0.2s;
+      }
+      .toggle-pw:hover {
+        color: var(--text);
+      }
+
+      /* Success card */
+      .success-card {
+        text-align: center;
+        padding: 20px 0;
+      }
+      .success-card__icon {
+        width: 64px;
+        height: 64px;
+        background: var(--success-dim);
+        border: 1px solid rgba(34, 197, 94, 0.3);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.6rem;
+        color: var(--success);
+        margin: 0 auto 16px;
+        animation: scaleIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      }
+      @keyframes scaleIn {
+        from {
+          transform: scale(0);
+          opacity: 0;
+        }
+        to {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+      .success-card h3 {
+        font-size: 1.1rem;
+        margin-bottom: 8px;
+      }
+      .success-card p {
+        font-size: 0.875rem;
+        color: var(--text-2);
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      class="login-container"
+      style="overflow: hidden; align-items: flex-start; padding-top: 40px"
+    >
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+
+      <div class="login-card" style="max-width: 440px">
+        <!-- Logo -->
+        <div class="login-logo">
+          <div class="login-logo__icon">
+            <i class="fas fa-user-shield"></i>
+          </div>
+          <h1>JOYIN<span>Admin</span></h1>
+          <p>Create Admin Account</p>
         </div>
+
+        <!-- Form (replaced by success card on completion) -->
+        <form id="signupForm" novalidate>
+          <!-- Username -->
+          <div class="form-group">
+            <label class="form-label" for="username">
+              <i
+                class="fas fa-user"
+                style="margin-right: 6px; color: var(--accent)"
+              ></i>
+              Username
+            </label>
+            <input
+              type="text"
+              id="username"
+              class="form-input"
+              placeholder="admin_john"
+              required
+              minlength="3"
+            />
+          </div>
+
+          <!-- Email -->
+          <div class="form-group">
+            <label class="form-label" for="email">
+              <i
+                class="fas fa-envelope"
+                style="margin-right: 6px; color: var(--accent)"
+              ></i>
+              Admin Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              class="form-input"
+              placeholder="admin@joyin.com"
+              required
+              autocomplete="email"
+            />
+          </div>
+
+          <!-- Password -->
+          <div class="form-group">
+            <label class="form-label" for="password">
+              <i
+                class="fas fa-lock"
+                style="margin-right: 6px; color: var(--accent)"
+              ></i>
+              Password
+            </label>
+            <div class="input-wrap">
+              <input
+                type="password"
+                id="password"
+                class="form-input"
+                placeholder="••••••••"
+                required
+                minlength="6"
+              />
+              <button type="button" class="toggle-pw" id="togglePw1">
+                <i class="fas fa-eye" id="twIcon1"></i>
+              </button>
+            </div>
+            <!-- Strength meter -->
+            <div class="strength-bar">
+              <div class="strength-fill" id="strengthFill"></div>
+            </div>
+            <div class="strength-label text-faint" id="strengthLabel">
+              Enter a password
+            </div>
+          </div>
+
+          <!-- Confirm password -->
+          <div class="form-group">
+            <label class="form-label" for="confirmPassword">
+              <i
+                class="fas fa-lock"
+                style="margin-right: 6px; color: var(--accent)"
+              ></i>
+              Confirm Password
+            </label>
+            <div class="input-wrap">
+              <input
+                type="password"
+                id="confirmPassword"
+                class="form-input"
+                placeholder="••••••••"
+                required
+              />
+              <button type="button" class="toggle-pw" id="togglePw2">
+                <i class="fas fa-eye" id="twIcon2"></i>
+              </button>
+            </div>
+            <div
+              class="strength-label text-faint"
+              id="matchLabel"
+              style="min-height: 16px"
+            ></div>
+          </div>
+
+          <!-- Admin secret key -->
+          <div class="form-group">
+            <label class="form-label" for="adminKey">
+              <i
+                class="fas fa-key"
+                style="margin-right: 6px; color: var(--accent)"
+              ></i>
+              Admin Secret Key
+            </label>
+            <input
+              type="password"
+              id="adminKey"
+              class="form-input"
+              placeholder="Enter secret key"
+              required
+            />
+            <div class="strength-label text-faint" style="margin-top: 5px">
+              <i class="fas fa-info-circle"></i> Required for first-time setup
+            </div>
+          </div>
+
+          <!-- Error message -->
+          <div
+            id="errorMessage"
+            class="error-message"
+            style="display: none; margin-bottom: 14px"
+          ></div>
+
+          <!-- Submit button -->
+          <button type="submit" class="login-btn" id="submitBtn">
+            <i class="fas fa-user-plus"></i> Create Admin Account
+          </button>
+        </form>
+
+        <!-- Sign-in link -->
+        <div
+          id="formFooter"
+          style="
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+          "
+        >
+          <p style="font-size: 0.82rem; color: var(--text-3)">
+            Already have an account?
+            <a
+              href="index.html"
+              style="color: var(--accent-l); font-weight: 600; margin-left: 4px"
+            >
+              Sign In
+              <i class="fas fa-arrow-right" style="font-size: 0.7rem"></i>
+            </a>
+          </p>
+          <p style="font-size: 0.72rem; color: var(--text-3); margin-top: 10px">
+            <i
+              class="fas fa-exclamation-triangle"
+              style="color: var(--warning)"
+            ></i>
+            Admin accounts have full access to all user data.
+          </p>
+        </div>
+      </div>
     </div>
 
     <script type="module">
-        import { createAdmin } from './js/auth.js';
-        
-        // Set your admin key here (change this to something secure!)
-        const ADMIN_SETUP_KEY = "JOYIN_ADMIN_SETUP";
-        
-        document.getElementById('signupForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const username = document.getElementById('username').value;
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            const confirmPassword = document.getElementById('confirmPassword').value;
-            const adminKey = document.getElementById('adminKey').value;
-            
-            const errorMessage = document.getElementById('errorMessage');
-            const successMessage = document.getElementById('successMessage');
-            const submitBtn = e.target.querySelector('button');
-            
-            // Clear messages
-            errorMessage.style.display = 'none';
-            successMessage.style.display = 'none';
-            
-            // Validation
-            if (password !== confirmPassword) {
-                errorMessage.textContent = "Passwords don't match";
-                errorMessage.style.display = 'block';
-                return;
-            }
-            
-            if (password.length < 6) {
-                errorMessage.textContent = "Password must be at least 6 characters";
-                errorMessage.style.display = 'block';
-                return;
-            }
-            
-            if (adminKey !== ADMIN_SETUP_KEY) {
-                errorMessage.textContent = "Invalid admin key";
-                errorMessage.style.display = 'block';
-                return;
-            }
-            
-            // Show loading
-            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating account...';
-            submitBtn.disabled = true;
-            
-            // Create admin
-            const result = await createAdmin(email, password, username);
-            
-            if (result.success) {
-                successMessage.innerHTML = `
-                    <i class="fas fa-check-circle"></i> 
-                    Admin account created successfully!<br>
-                    <small>User ID: ${result.userId.substring(0, 16)}...</small>
-                `;
-                successMessage.style.display = 'block';
-                
-                submitBtn.innerHTML = '<i class="fas fa-check"></i> Account Created!';
-                
-                // Redirect after 3 seconds
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 3000);
-                
-                // Store admin email for convenience
-                localStorage.setItem('adminEmail', email);
-                
-            } else {
-                submitBtn.innerHTML = '<i class="fas fa-user-plus"></i> Create Admin Account';
-                submitBtn.disabled = false;
-                
-                errorMessage.textContent = result.error || 'Account creation failed';
-                errorMessage.style.display = 'block';
-                
-                // Specific error handling
-                if (result.error.includes('email-already-in-use')) {
-                    errorMessage.textContent = "This email is already registered";
-                } else if (result.error.includes('weak-password')) {
-                    errorMessage.textContent = "Password is too weak";
-                } else if (result.error.includes('invalid-email')) {
-                    errorMessage.textContent = "Invalid email address";
-                }
-            }
+      import { createAdmin } from "./js/auth.js";
+
+      // ── Admin secret key (change this before deploying!) ──
+      const ADMIN_SETUP_KEY = "JOYIN_ADMIN_SETUP";
+
+      const form = document.getElementById("signupForm");
+      const errMsg = document.getElementById("errorMessage");
+      const btn = document.getElementById("submitBtn");
+      const pwInput = document.getElementById("password");
+      const cpInput = document.getElementById("confirmPassword");
+
+      // ── Toggle password visibility helpers ──
+      function setupToggle(btnId, iconId, inputId) {
+        document.getElementById(btnId).addEventListener("click", () => {
+          const input = document.getElementById(inputId);
+          const icon = document.getElementById(iconId);
+          const hidden = input.type === "password";
+          input.type = hidden ? "text" : "password";
+          icon.className = `fas fa-eye${hidden ? "-slash" : ""}`;
         });
-        
-        // Auto-fill email if stored
-        const savedEmail = localStorage.getItem('adminEmail');
-        if (savedEmail) {
-            document.getElementById('email').value = savedEmail;
+      }
+      setupToggle("togglePw1", "twIcon1", "password");
+      setupToggle("togglePw2", "twIcon2", "confirmPassword");
+
+      // ── Password strength meter ──
+      pwInput.addEventListener("input", () => {
+        const { percent, label, color } = strengthOf(pwInput.value);
+        document.getElementById("strengthFill").style.width = percent + "%";
+        document.getElementById("strengthFill").style.background = color;
+        document.getElementById("strengthLabel").textContent = label;
+        document.getElementById("strengthLabel").style.color = color;
+        checkMatch(); // re-check match as well
+      });
+
+      /**
+       * Evaluates password strength.
+       * Returns { percent, label, color } used for the visual indicator.
+       */
+      function strengthOf(pw) {
+        if (!pw)
+          return {
+            percent: 0,
+            label: "Enter a password",
+            color: "var(--text-3)",
+          };
+        if (pw.length < 6)
+          return { percent: 15, label: "Too short", color: "#f87171" };
+
+        let score = 0;
+        if (pw.length >= 8) score++;
+        if (pw.length >= 12) score++;
+        if (/[A-Z]/.test(pw)) score++;
+        if (/[a-z]/.test(pw)) score++;
+        if (/\d/.test(pw)) score++;
+        if (/[^A-Za-z0-9]/.test(pw)) score++;
+
+        if (score <= 2) return { percent: 33, label: "Weak", color: "#f87171" };
+        if (score <= 4)
+          return { percent: 66, label: "Medium", color: "var(--warning)" };
+        return { percent: 100, label: "Strong", color: "var(--success)" };
+      }
+
+      // ── Confirm password match feedback ──
+      cpInput.addEventListener("input", checkMatch);
+
+      function checkMatch() {
+        const lbl = document.getElementById("matchLabel");
+        if (!cpInput.value) {
+          lbl.textContent = "";
+          return;
         }
-        
-        // Add password strength indicator
-        const passwordInput = document.getElementById('password');
-        passwordInput.addEventListener('input', function() {
-            const strength = checkPasswordStrength(this.value);
-            const indicator = document.getElementById('passwordStrength') || 
-                (() => {
-                    const div = document.createElement('div');
-                    div.id = 'passwordStrength';
-                    div.style.cssText = 'font-size: 12px; margin-top: 5px;';
-                    this.parentNode.appendChild(div);
-                    return div;
-                })();
-            
-            indicator.innerHTML = `Strength: <span style="color:${strength.color}">${strength.text}</span>`;
-        });
-        
-        function checkPasswordStrength(password) {
-            if (password.length === 0) return { text: 'None', color: '#aaa' };
-            if (password.length < 6) return { text: 'Weak', color: '#ff4757' };
-            
-            const hasUpper = /[A-Z]/.test(password);
-            const hasLower = /[a-z]/.test(password);
-            const hasNumber = /\d/.test(password);
-            const hasSpecial = /[^A-Za-z0-9]/.test(password);
-            
-            let score = 0;
-            if (hasUpper) score++;
-            if (hasLower) score++;
-            if (hasNumber) score++;
-            if (hasSpecial) score++;
-            if (password.length >= 8) score++;
-            if (password.length >= 12) score++;
-            
-            if (score <= 2) return { text: 'Weak', color: '#ff4757' };
-            if (score <= 4) return { text: 'Medium', color: '#ffa502' };
-            return { text: 'Strong', color: '#2ed573' };
+        if (cpInput.value === pwInput.value) {
+          lbl.textContent = "✓ Passwords match";
+          lbl.style.color = "var(--success)";
+        } else {
+          lbl.textContent = "✗ Passwords do not match";
+          lbl.style.color = "#f87171";
         }
+      }
+
+      // ── Form submission ──
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        errMsg.style.display = "none";
+
+        const username = document.getElementById("username").value.trim();
+        const email = document.getElementById("email").value.trim();
+        const password = pwInput.value;
+        const confirm = cpInput.value;
+        const adminKey = document.getElementById("adminKey").value;
+
+        // ── Client-side validation ──
+        if (password !== confirm) {
+          showError("Passwords do not match.");
+          return;
+        }
+        if (password.length < 6) {
+          showError("Password must be at least 6 characters.");
+          return;
+        }
+        if (adminKey !== ADMIN_SETUP_KEY) {
+          showError("Invalid admin secret key.");
+          return;
+        }
+
+        // ── Loading state ──
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Creating account…`;
+
+        try {
+          const result = await createAdmin(email, password, username);
+
+          if (result.success) {
+            // ── Replace form with success card ──
+            form.innerHTML = `
+                        <div class="success-card">
+                            <div class="success-card__icon"><i class="fas fa-check"></i></div>
+                            <h3>Account created!</h3>
+                            <p>Welcome to JOYIN Admin.<br>Redirecting to login…</p>
+                            <p style="font-size:.72rem;color:var(--text-3);margin-top:12px;font-family:var(--mono);">
+                                ID: ${result.userId.substring(0, 16)}…
+                            </p>
+                        </div>
+                    `;
+            document.getElementById("formFooter").style.display = "none";
+
+            // Save email for convenience on login page
+            localStorage.setItem("adminEmail", email);
+
+            setTimeout(() => (window.location.href = "index.html"), 3000);
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = `<i class="fas fa-user-plus"></i> Create Admin Account`;
+            showError(friendlyError(result.error));
+          }
+        } catch (err) {
+          btn.disabled = false;
+          btn.innerHTML = `<i class="fas fa-user-plus"></i> Create Admin Account`;
+          showError("System error: " + err.message);
+        }
+      });
+
+      /** Shows a formatted error message. */
+      function showError(msg) {
+        errMsg.textContent = msg;
+        errMsg.style.display = "block";
+      }
+
+      /**
+       * Maps Firebase error codes to friendly messages
+       * so the user doesn't see raw SDK strings.
+       */
+      function friendlyError(msg = "") {
+        if (msg.includes("email-already-in-use"))
+          return "This email is already registered.";
+        if (msg.includes("weak-password"))
+          return "Password is too weak — choose something stronger.";
+        if (msg.includes("invalid-email"))
+          return "Please enter a valid email address.";
+        return msg || "Account creation failed.";
+      }
+
+      // ── Auto-fill saved email ──
+      const savedEmail = localStorage.getItem("adminEmail");
+      if (savedEmail) document.getElementById("email").value = savedEmail;
     </script>
-</body>
+  </body>
 </html>

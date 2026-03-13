@@ -1,204 +1,341 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JOYIN - Video Posts Admin</title>
-    <link rel="stylesheet" href="admin-video.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-     <link rel="icon" href="../J _ A192.png">
-
-    <link rel="manifest" href="../admin-manifest.json">
-<meta name="theme-color" content="#5b53f2">
-<script src="../admin-pwa-install.js"></script>
-</head>
-<body>
-    <!-- TOP NAVIGATION -->
-    <header class="top-nav">
-        <div class="nav-left">
-            <button class="nav-btn" id="backBtn">
-                <i class="fas fa-arrow-left"></i>
-            </button>
-            <h1 class="nav-title">Video Posts Admin</h1>
-        </div>
-        <button class="refresh-btn" id="refreshBtn">
-            <i class="fas fa-sync-alt"></i>
-            Refresh
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>Video Posts — JOYIN Admin</title>
+    <link rel="stylesheet" href="../css/admin.css" />
+    <link rel="stylesheet" href="./admin-video.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="icon" href="../J _ A192.png" />
+    <link rel="manifest" href="/admin-manifest.json" />
+    <meta name="theme-color" content="#5b53f2" />
+    <script src="/admin-pwa-install.js"></script>
+  </head>
+  <body>
+    <!-- ── SIDEBAR ── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__logo"><i class="fas fa-crown"></i> JOYIN Admin</div>
+      <nav class="sidebar__nav">
+        <a href="../dashboard.html" class="nav-link"
+          ><i class="fas fa-chart-line"></i> Dashboard</a
+        >
+        <a href="../users.html" class="nav-link"
+          ><i class="fas fa-users"></i> Users</a
+        >
+        <a href="../posts.html" class="nav-link"
+          ><i class="fas fa-newspaper"></i> Posts</a
+        >
+        <a href="../Admin-feedback/feedback-admin.html" class="nav-link"
+          ><i class="fas fa-comment-dots"></i> Feedback</a
+        >
+        <a href="../updates/" class="nav-link"
+          ><i class="fas fa-bell"></i> Updates</a
+        >
+        <a href="./index.html" class="nav-link active"
+          ><i class="fas fa-video"></i> Video Posts</a
+        >
+      </nav>
+      <div class="sidebar__footer">
+        <button id="logoutBtn" class="logout-btn">
+          <i class="fas fa-sign-out-alt"></i> Logout
         </button>
+      </div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- ── TOP BAR ── -->
+    <header class="topbar">
+      <div class="topbar__title">
+        <button class="hamburger" id="hamburger">
+          <span></span><span></span><span></span>
+        </button>
+        <button
+          id="backBtn"
+          class="btn"
+          style="padding: 6px 10px; margin-right: 4px"
+        >
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <i class="fas fa-video"></i> Video Posts
+      </div>
+      <div class="topbar__right">
+        <button id="refreshBtn" class="btn btn-primary">
+          <i class="fas fa-sync-alt"></i> Refresh
+        </button>
+      </div>
     </header>
 
-    <!-- MAIN CONTAINER -->
-    <div class="admin-container">
-        
-        <!-- STATISTICS CARDS -->
-        <div class="stats-grid">
-            <!-- Total Videos -->
-            <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(91, 83, 242, 0.2);">
-                    <i class="fas fa-video" style="color: #5b53f2;"></i>
-                </div>
-                <div class="stat-info">
-                    <p class="stat-label">Total Videos</p>
-                    <p class="stat-value" id="totalVideos">0</p>
-                </div>
-            </div>
+    <!-- ── MAIN ── -->
+    <main class="page-content">
+      <!-- ── STATS STRIP ── -->
+      <div
+        class="stats-grid stagger"
+        style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr))"
+      >
+        <div class="stat-card">
+          <div class="stat-card__icon"><i class="fas fa-video"></i></div>
+          <div class="stat-value" id="statTotal">—</div>
+          <div class="stat-label">Total Videos</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__icon"><i class="fas fa-calendar-day"></i></div>
+          <div class="stat-value" id="statToday">—</div>
+          <div class="stat-label">Today</div>
+        </div>
+        <!-- NEW: Total Views stat card -->
+        <div class="stat-card">
+          <div
+            class="stat-card__icon"
+            style="background: rgba(91, 83, 242, 0.15)"
+          >
+            <i class="fas fa-eye" style="color: var(--accent-l)"></i>
+          </div>
+          <div class="stat-value" id="statViews">—</div>
+          <div class="stat-label">Total Views</div>
+        </div>
+        <div class="stat-card">
+          <div
+            class="stat-card__icon"
+            style="background: rgba(239, 68, 68, 0.1)"
+          >
+            <i class="fas fa-heart" style="color: #f87171"></i>
+          </div>
+          <div class="stat-value" id="statLikes">—</div>
+          <div class="stat-label">Total Likes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__icon"><i class="fas fa-comment"></i></div>
+          <div class="stat-value" id="statComments">—</div>
+          <div class="stat-label">Comments</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-card__icon"><i class="fas fa-users"></i></div>
+          <div class="stat-value" id="statUsers">—</div>
+          <div class="stat-label">Creators</div>
+        </div>
+        <div class="stat-card stat-card--storage">
+          <div
+            class="stat-card__icon"
+            style="background: rgba(239, 68, 68, 0.1)"
+          >
+            <i class="fas fa-database" style="color: #f87171"></i>
+          </div>
+          <div class="stat-value" id="statStorage">—</div>
+          <div class="stat-label">Storage Used</div>
+        </div>
+      </div>
 
-            <!-- Today's Videos -->
-            <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(46, 213, 115, 0.2);">
-                    <i class="fas fa-calendar-day" style="color: #2ed573;"></i>
-                </div>
-                <div class="stat-info">
-                    <p class="stat-label">Today's Videos</p>
-                    <p class="stat-value" id="todayVideos">0</p>
-                </div>
-            </div>
+      <!-- ── TOOLBAR ── -->
+      <div class="card" style="margin-bottom: 20px">
+        <div class="toolbar" style="flex-wrap: wrap; gap: 10px">
+          <!-- Time range filter chips -->
+          <div class="time-filters">
+            <button class="filter-chip active" data-time="all">All</button>
+            <button class="filter-chip" data-time="today">Today</button>
+            <button class="filter-chip" data-time="week">This Week</button>
+          </div>
 
-            <!-- This Week -->
-            <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(255, 159, 67, 0.2);">
-                    <i class="fas fa-calendar-week" style="color: #ff9f43;"></i>
-                </div>
-                <div class="stat-info">
-                    <p class="stat-label">This Week</p>
-                    <p class="stat-value" id="weekVideos">0</p>
-                </div>
-            </div>
+          <!-- Search -->
+          <div class="search-box" style="flex: 1; min-width: 200px">
+            <i class="fas fa-search"></i>
+            <input
+              type="text"
+              id="searchInput"
+              class="search-input"
+              placeholder="Search by username, caption, or ID…"
+            />
+          </div>
 
-            <!-- Total Storage Used -->
-            <div class="stat-card">
-                <div class="stat-icon" style="background: rgba(238, 82, 83, 0.2);">
-                    <i class="fas fa-database" style="color: #ee5253;"></i>
-                </div>
-                <div class="stat-info">
-                    <p class="stat-label">Storage Used</p>
-                    <p class="stat-value" id="storageUsed">0 MB</p>
-                </div>
-            </div>
+          <!-- Sort -->
+          <select
+            id="sortSelect"
+            class="search-box"
+            style="width: auto; flex-shrink: 0; padding: 9px 12px"
+          >
+            <option value="createdAt-desc">Newest first</option>
+            <option value="createdAt-asc">Oldest first</option>
+            <option value="likeCount-desc">Most liked</option>
+            <option value="viewCount-desc">Most viewed</option>
+            <option value="commentCount-desc">Most commented</option>
+            <option value="duration-desc">Longest videos</option>
+            <option value="fileSize-desc">Largest files</option>
+          </select>
+
+          <!-- ── VIEW TOGGLE ── -->
+          <!-- Switches between TikTok-style grid and the Users/Posts-style table -->
+          <div class="view-toggle" title="Switch view">
+            <button
+              class="view-toggle__btn active"
+              data-view="grid"
+              title="Grid view"
+            >
+              <i class="fas fa-th"></i>
+            </button>
+            <button
+              class="view-toggle__btn"
+              data-view="table"
+              title="Table view"
+            >
+              <i class="fas fa-list"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── GRID VIEW ── -->
+      <div id="videoGrid" class="video-grid">
+        <!-- Skeleton or real cards rendered by JS -->
+      </div>
+
+      <!-- ── TABLE VIEW ── (hidden until user switches) -->
+      <div id="videoTableWrap" class="card" style="display: none">
+        <div class="card-header">
+          <span class="card-title">
+            <i class="fas fa-video"></i> Video Posts
+            <span
+              id="videoTableBadge"
+              style="
+                background: var(--surface-3);
+                padding: 2px 10px;
+                border-radius: var(--r-full);
+                font-size: 0.75rem;
+                color: var(--text-2);
+              "
+            >
+              …
+            </span>
+          </span>
+        </div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Author</th>
+                <th>Caption</th>
+                <th>Date</th>
+                <th>Duration</th>
+                <th>Likes</th>
+                <th>Views</th>
+                <th>Comments</th>
+                <th>Size</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="videoTableBody">
+              <!-- filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ── EMPTY STATE ── -->
+      <div id="emptyState" style="display: none">
+        <div class="empty-state">
+          <i class="fas fa-video-slash"></i>
+          <p>No videos match your current filter.</p>
+        </div>
+      </div>
+
+      <!-- ── PAGINATION ── -->
+      <div
+        id="paginationWrap"
+        class="pagination"
+        style="display: none; margin-top: 20px"
+      >
+        <div class="pagination__info">
+          Showing
+          <strong id="pagFrom">—</strong>–<strong id="pagTo">—</strong> of
+          <strong id="pagTotal">—</strong> videos
+        </div>
+        <div class="pagination__controls">
+          <button id="prevBtn" class="btn" disabled>
+            <i class="fas fa-chevron-left"></i> Prev
+          </button>
+          <span id="pagInfo" class="page-info">Page 1</span>
+          <button id="nextBtn" class="btn">
+            Next <i class="fas fa-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </main>
+
+    <!-- ═══════════════════════════════════════════════════════
+         VIDEO PLAYER MODAL
+         ═══════════════════════════════════════════════════ -->
+    <div id="playerModal" class="modal-overlay">
+      <div class="modal" style="max-width: 900px; overflow: hidden">
+        <div class="modal-header">
+          <span class="modal-title"
+            ><i class="fas fa-film"></i> Video Preview</span
+          >
+          <button class="close-modal" id="closePlayerBtn">×</button>
         </div>
 
-        <!-- FILTERS & SEARCH -->
-        <div class="filters-section">
-            <div class="search-box">
-                <i class="fas fa-search"></i>
-                <input type="text" id="searchInput" placeholder="Search by username or video ID...">
+        <!-- Two-column layout: player left, details right -->
+        <div class="player-layout">
+          <!-- Left: video -->
+          <div class="player-left">
+            <video
+              id="playerVideo"
+              controls
+              playsinline
+              style="width: 100%; max-height: 62vh; display: block"
+            ></video>
+          </div>
+
+          <!-- Right: metadata + actions -->
+          <div class="player-right">
+            <div class="player-details" id="playerDetails">
+              <!-- filled by JS -->
             </div>
-            
-            <div class="filter-buttons">
-                <button class="filter-btn active" data-filter="all">
-                    All Videos
-                </button>
-                <button class="filter-btn" data-filter="today">
-                    Today
-                </button>
-                <button class="filter-btn" data-filter="week">
-                    This Week
-                </button>
+
+            <div class="player-footer">
+              <button
+                id="playerDeleteBtn"
+                class="btn btn-danger"
+                style="flex: 1"
+              >
+                <i class="fas fa-trash"></i> Delete Video
+              </button>
+              <button class="btn" id="closePlayerFooterBtn" style="flex: 1">
+                <i class="fas fa-times"></i> Close
+              </button>
             </div>
+          </div>
         </div>
-
-        <!-- LOADING INDICATOR -->
-        <div class="loading-container" id="loadingContainer">
-            <i class="fas fa-spinner fa-spin"></i>
-            <p>Loading videos...</p>
-        </div>
-
-        <!-- VIDEO LIST -->
-        <div class="video-list" id="videoList">
-            <!-- Videos will be loaded here dynamically -->
-        </div>
-
-        <!-- NO VIDEOS MESSAGE -->
-        <div class="no-videos" id="noVideosMessage" style="display: none;">
-            <i class="fas fa-video-slash"></i>
-            <p>No videos found</p>
-        </div>
-
+      </div>
     </div>
 
-    <!-- VIDEO PREVIEW MODAL -->
-    <div class="modal" id="previewModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Video Preview</h3>
-                <button class="close-btn" id="closeModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="modal-body">
-                <video id="modalVideo" controls playsinline></video>
-                
-                <div class="video-details">
-                    <div class="detail-row">
-                        <span class="detail-label">Posted by:</span>
-                        <span class="detail-value" id="modalUsername">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Video ID:</span>
-                        <span class="detail-value" id="modalVideoId">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Upload Date:</span>
-                        <span class="detail-value" id="modalDate">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Duration:</span>
-                        <span class="detail-value" id="modalDuration">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">File Size:</span>
-                        <span class="detail-value" id="modalSize">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Likes:</span>
-                        <span class="detail-value" id="modalLikes">-</span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">Comments:</span>
-                        <span class="detail-value" id="modalComments">-</span>
-                    </div>
-                    <div class="detail-row caption-row" id="captionRow" style="display: none;">
-                        <span class="detail-label">Caption:</span>
-                        <span class="detail-value" id="modalCaption">-</span>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="modal-footer">
-                <button class="modal-btn delete-btn" id="deleteVideoBtn">
-                    <i class="fas fa-trash"></i>
-                    Delete Video
-                </button>
-                <button class="modal-btn cancel-btn" id="cancelBtn">
-                    Cancel
-                </button>
-            </div>
-        </div>
-    </div>
+    <script type="module">
+      import { checkAdminAuth } from "../js/auth.js";
+      import { adminLogout } from "../js/auth.js";
+      import { setupSidebar } from "../js/ui.js";
 
-    <!-- DELETE CONFIRMATION MODAL -->
-    <div class="modal" id="confirmModal">
-        <div class="modal-content confirm-modal">
-            <div class="confirm-icon">
-                <i class="fas fa-exclamation-triangle"></i>
-            </div>
-            <h3>Delete Video?</h3>
-            <p>This action cannot be undone. The video and all its data will be permanently deleted.</p>
-            
-            <div class="confirm-buttons">
-                <button class="confirm-delete-btn" id="confirmDeleteBtn">
-                    <i class="fas fa-trash"></i>
-                    Yes, Delete
-                </button>
-                <button class="confirm-cancel-btn" id="confirmCancelBtn">
-                    Cancel
-                </button>
-            </div>
-        </div>
-    </div>
+      const user = await checkAdminAuth();
+      if (!user) window.location.href = "../index.html";
 
-    <!-- Firebase and Script -->
-    <script type="module" src="admin-video.js" defer></script>
-</body>
+      document
+        .getElementById("logoutBtn")
+        .addEventListener("click", adminLogout);
+      setupSidebar();
+
+      document
+        .getElementById("closePlayerFooterBtn")
+        .addEventListener("click", () => {
+          document.getElementById("playerModal").classList.remove("open");
+          const v = document.getElementById("playerVideo");
+          v.pause();
+          v.src = "";
+        });
+    </script>
+
+    <script type="module" src="admin-video.js"></script>
+  </body>
 </html>

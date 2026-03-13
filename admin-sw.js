@@ -3,29 +3,30 @@
 // UPDATES DEPLOY INSTANTLY WITHOUT CLEARING CACHE
 // ============================================
 
-const CACHE_VERSION = 'v1.0.0'; // 👈 INCREMENT THIS FOR EACH UPDATE
+const CACHE_VERSION = "v1.0.0"; // 👈 INCREMENT THIS FOR EACH UPDATE
 const CACHE_NAME = `joyin-${CACHE_VERSION}`;
-const OFFLINE_URL = '/offline.html';
+const OFFLINE_URL = "/offline.html";
 
 // Essential files to cache
 const PRECACHE_URLS = [
-  '/',
-  '/dashboard.html',
-  '/login.html',
-  '/posts.html',
-  '/offline.html',
-  '/manifest.json',
-  'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
+  "/",
+  "/dashboard.html",
+  "/login.html",
+  "/posts.html",
+  "/offline.html",
+  "/manifest.json",
+  "https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css",
 ];
 
 // ============================================
 // INSTALL - Cache essentials
 // ============================================
-self.addEventListener('install', (event) => {
+self.addEventListener("install", (event) => {
   console.log(`🔧 [SW ${CACHE_VERSION}] Installing...`);
-  
+
   event.waitUntil(
-    caches.open(CACHE_NAME)
+    caches
+      .open(CACHE_NAME)
       .then((cache) => {
         console.log(`📦 [SW ${CACHE_VERSION}] Caching essentials`);
         return cache.addAll(PRECACHE_URLS);
@@ -36,18 +37,19 @@ self.addEventListener('install', (event) => {
       })
       .catch((error) => {
         console.error(`❌ [SW ${CACHE_VERSION}] Installation failed:`, error);
-      })
+      }),
   );
 });
 
 // ============================================
 // ACTIVATE - Delete old caches immediately
 // ============================================
-self.addEventListener('activate', (event) => {
+self.addEventListener("activate", (event) => {
   console.log(`🚀 [SW ${CACHE_VERSION}] Activating...`);
-  
+
   event.waitUntil(
-    caches.keys()
+    caches
+      .keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames.map((cacheName) => {
@@ -55,7 +57,7 @@ self.addEventListener('activate', (event) => {
               console.log(`🗑️ [SW] Deleting old cache: ${cacheName}`);
               return caches.delete(cacheName);
             }
-          })
+          }),
         );
       })
       .then(() => {
@@ -67,45 +69,51 @@ self.addEventListener('activate', (event) => {
         return self.clients.matchAll().then((clients) => {
           clients.forEach((client) => {
             client.postMessage({
-              type: 'SW_UPDATED',
-              version: CACHE_VERSION
+              type: "SW_UPDATED",
+              version: CACHE_VERSION,
             });
           });
         });
-      })
+      }),
   );
 });
 
 // ============================================
 // FETCH - NETWORK-FIRST for HTML/JS/CSS
 // ============================================
-self.addEventListener('fetch', (event) => {
+self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
-  
+
   // Skip non-GET requests
-  if (request.method !== 'GET') return;
-  
+  if (request.method !== "GET") return;
+
   // Skip cross-origin (except CDN)
-  if (url.origin !== location.origin && !url.href.includes('cdnjs.cloudflare.com')) {
+  if (
+    url.origin !== location.origin &&
+    !url.href.includes("cdnjs.cloudflare.com")
+  ) {
     return;
   }
-  
+
   // Skip Firebase/API
-  if (url.pathname.includes('firestore') || 
-      url.pathname.includes('firebase') ||
-      url.pathname.includes('googleapis') ||
-      url.hostname.includes('gstatic.com')) {
+  if (
+    url.pathname.includes("firestore") ||
+    url.pathname.includes("firebase") ||
+    url.pathname.includes("googleapis") ||
+    url.hostname.includes("gstatic.com")
+  ) {
     return;
   }
-  
+
   // ============================================
   // NETWORK-FIRST for HTML/JS/CSS (always fresh)
   // ============================================
-  if (request.mode === 'navigate' || 
-      request.destination === 'script' ||
-      request.destination === 'style') {
-    
+  if (
+    request.mode === "navigate" ||
+    request.destination === "script" ||
+    request.destination === "style"
+  ) {
     event.respondWith(
       fetch(request)
         .then((response) => {
@@ -120,52 +128,50 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // Only use cache if network fails
-          return caches.match(request)
-            .then((cachedResponse) => {
-              if (cachedResponse) {
-                console.log(`📦 [SW] Serving cached (offline): ${request.url}`);
-                return cachedResponse;
-              }
-              
-              // Show offline page
-              if (request.mode === 'navigate') {
-                return caches.match(OFFLINE_URL) || createFallbackResponse();
-              }
-              
-              throw new Error('No cache available');
-            });
-        })
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+              console.log(`📦 [SW] Serving cached (offline): ${request.url}`);
+              return cachedResponse;
+            }
+
+            // Show offline page
+            if (request.mode === "navigate") {
+              return caches.match(OFFLINE_URL) || createFallbackResponse();
+            }
+
+            throw new Error("No cache available");
+          });
+        }),
     );
     return;
   }
-  
+
   // ============================================
   // CACHE-FIRST for images/fonts (they don't change)
   // ============================================
   event.respondWith(
-    caches.match(request)
-      .then((cachedResponse) => {
-        if (cachedResponse) {
-          return cachedResponse;
-        }
-        
-        return fetch(request)
-          .then((response) => {
-            if (response.ok && request.url.startsWith('http')) {
-              const responseClone = response.clone();
-              caches.open(CACHE_NAME).then((cache) => {
-                cache.put(request, responseClone);
-              });
-            }
-            return response;
-          })
-          .catch(() => {
-            if (request.destination === 'image') {
-              return createPlaceholderImage();
-            }
-            throw new Error('Fetch failed');
-          });
-      })
+    caches.match(request).then((cachedResponse) => {
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(request)
+        .then((response) => {
+          if (response.ok && request.url.startsWith("http")) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          if (request.destination === "image") {
+            return createPlaceholderImage();
+          }
+          throw new Error("Fetch failed");
+        });
+    }),
   );
 });
 
@@ -222,12 +228,12 @@ function createFallbackResponse() {
     </body>
     </html>
   `;
-  
+
   return new Response(html, {
     headers: {
-      'Content-Type': 'text/html',
-      'Cache-Control': 'no-cache'
-    }
+      "Content-Type": "text/html",
+      "Cache-Control": "no-cache",
+    },
   });
 }
 
@@ -244,30 +250,30 @@ function createPlaceholderImage() {
             font-family="Arial" font-size="16" fill="rgba(255,255,255,0.5)">Offline</text>
     </svg>
   `;
-  
+
   return new Response(svg, {
     headers: {
-      'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'no-cache'
-    }
+      "Content-Type": "image/svg+xml",
+      "Cache-Control": "no-cache",
+    },
   });
 }
 
 // ============================================
 // MESSAGE HANDLER
 // ============================================
-self.addEventListener('message', (event) => {
-  console.log('💬 [SW] Message:', event.data);
-  
-  if (event.data.type === 'SKIP_WAITING') {
+self.addEventListener("message", (event) => {
+  console.log("💬 [SW] Message:", event.data);
+
+  if (event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
-  
-  if (event.data.type === 'CLEAR_CACHE') {
+
+  if (event.data.type === "CLEAR_CACHE") {
     event.waitUntil(
       caches.keys().then((names) => {
         return Promise.all(names.map((name) => caches.delete(name)));
-      })
+      }),
     );
   }
 });

@@ -1,104 +1,276 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>JOYIN Admin - Login</title>
-    <link rel="stylesheet" href="css/admin.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/x-icon" href="/J _ A192.png">
-    <link rel="manifest" href="/admin-manifest.json">
-    <meta name="theme-color" content="#5b53f2">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <title>JOYIN Admin — Sign In</title>
+    <link rel="stylesheet" href="css/admin.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="icon" type="image/x-icon" href="/J _ A192.png" />
+    <link rel="manifest" href="/admin-manifest.json" />
+    <meta name="theme-color" content="#5b53f2" />
     <script src="/admin-pwa-install.js"></script>
-    <link rel="icon" href="./J _ A192.png">
-</head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <div class="login-logo">
-                <h1>JOYIN<span>Admin</span></h1>
-                <p style="color: var(--text-secondary); margin-top: 8px;">Secure Admin Portal</p>
-            </div>
-            
-            <form id="loginForm">
-                <div class="form-group">
-                    <label for="email"><i class="fas fa-envelope"></i> Admin Email</label>
-                    <input type="email" id="email" placeholder="admin@joyin.com" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password"><i class="fas fa-lock"></i> Password</label>
-                    <input type="password" id="password" placeholder="••••••••" required>
-                </div>
-                
-                <!-- ERROR MESSAGE ELEMENT WAS MISSING -->
-                <div id="errorMessage" style="color: red; display: none; margin: 10px 0; padding: 10px; background: rgba(255,0,0,0.1); border-radius: 5px;"></div>
-                
-                <button type="submit" class="login-btn">
-                    <i class="fas fa-sign-in-alt"></i> Sign In
-                </button>
-            </form> <!-- FORM WAS NOT CLOSED -->
-        </div> <!-- LOGIN-CARD WAS NOT CLOSED -->
-    </div> <!-- LOGIN-CONTAINER WAS NOT CLOSED -->
-    
-    <!-- Login Script -->
-    <script type="module">
-        // FIRST: Add error logging
-        console.log('Auth script loading...');
-        
-        // Try with error handling
-        import { adminLogin } from './js/auth.js';
-        try {
-            
-            console.log('Auth module loaded successfully');
-            
-            document.getElementById('loginForm').addEventListener('submit', async (e) => {
-                e.preventDefault();
-                console.log('Form submitted');
-                
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                const errorMessage = document.getElementById('errorMessage');
-                const submitBtn = e.target.querySelector('button');
-                
-                console.log('Attempting login for:', email);
-                
-                // Show loading
-                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Authenticating...';
-                submitBtn.disabled = true;
-                errorMessage.style.display = 'none';
-                
-                try {
-                    const result = await adminLogin(email, password);
-                    console.log('Login result:', result);
-                    
-                    if (result.success) {
-                        submitBtn.innerHTML = '<i class="fas fa-check"></i> Success! Redirecting...';
-                        setTimeout(() => {
-                            window.location.href = 'dashboard.html';
-                        }, 1000);
-                    } else {
-                        submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-                        submitBtn.disabled = false;
-                        errorMessage.textContent = result.error || 'Login failed';
-                        errorMessage.style.display = 'block';
-                        console.error('Login error:', result.error);
-                    }
-                } catch (loginError) {
-                    submitBtn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
-                    submitBtn.disabled = false;
-                    errorMessage.textContent = 'System error: ' + loginError.message;
-                    errorMessage.style.display = 'block';
-                    console.error('Login catch error:', loginError);
-                }
-            });
-        } catch (importError) {
-            console.error('Failed to load auth module:', importError);
-            document.getElementById('loginForm').addEventListener('submit', (e) => {
-                e.preventDefault();
-                alert('Authentication system not loaded. Check console for errors.');
-            });
+
+    <style>
+      /* Animated background blobs */
+      .blob {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        opacity: 0.12;
+        pointer-events: none;
+        animation: blobFloat 18s ease-in-out infinite;
+      }
+      .blob-1 {
+        width: 400px;
+        height: 400px;
+        background: var(--accent);
+        top: -180px;
+        right: -60px;
+      }
+      .blob-2 {
+        width: 280px;
+        height: 280px;
+        background: #7b74f5;
+        bottom: -100px;
+        left: 5%;
+        animation-delay: -6s;
+        animation-duration: 14s;
+      }
+      @keyframes blobFloat {
+        0%,
+        100% {
+          transform: translate(0, 0) scale(1);
         }
+        33% {
+          transform: translate(20px, 30px) scale(1.05);
+        }
+        66% {
+          transform: translate(-15px, 15px) scale(0.95);
+        }
+      }
+
+      /* Password toggle */
+      .input-wrap {
+        position: relative;
+      }
+      .input-wrap .form-input {
+        padding-right: 44px;
+      }
+      .toggle-pw {
+        position: absolute;
+        right: 12px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-3);
+        cursor: pointer;
+        font-size: 0.9rem;
+        padding: 4px;
+        transition: color 0.2s;
+      }
+      .toggle-pw:hover {
+        color: var(--text);
+      }
+
+      /* Success state on button */
+      .login-btn.success {
+        background: var(--success) !important;
+        box-shadow: 0 4px 20px rgba(34, 197, 94, 0.3) !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="login-container" style="overflow: hidden">
+      <!-- decorative blobs -->
+      <div class="blob blob-1"></div>
+      <div class="blob blob-2"></div>
+
+      <div class="login-card">
+        <!-- Logo -->
+        <div class="login-logo">
+          <div class="login-logo__icon">
+            <i class="fas fa-crown"></i>
+          </div>
+          <h1>JOYIN<span>Admin</span></h1>
+          <p>Secure Control Panel</p>
+        </div>
+
+        <!-- Form -->
+        <form id="loginForm" novalidate>
+          <!-- Email -->
+          <div class="form-group">
+            <label class="form-label" for="email">
+              <i
+                class="fas fa-envelope"
+                style="margin-right: 6px; color: var(--accent)"
+              ></i>
+              Admin Email
+            </label>
+            <input
+              type="email"
+              id="email"
+              class="form-input"
+              placeholder="admin@joyin.com"
+              required
+              autocomplete="email"
+            />
+          </div>
+
+          <!-- Password -->
+          <div class="form-group">
+            <label class="form-label" for="password">
+              <i
+                class="fas fa-lock"
+                style="margin-right: 6px; color: var(--accent)"
+              ></i>
+              Password
+            </label>
+            <div class="input-wrap">
+              <input
+                type="password"
+                id="password"
+                class="form-input"
+                placeholder="••••••••"
+                required
+                autocomplete="current-password"
+              />
+              <button
+                type="button"
+                class="toggle-pw"
+                id="togglePw"
+                aria-label="Show password"
+              >
+                <i class="fas fa-eye" id="togglePwIcon"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Error message (hidden by default) -->
+          <div
+            id="errorMessage"
+            class="error-message"
+            style="display: none"
+          ></div>
+
+          <!-- Submit button -->
+          <button type="submit" class="login-btn" id="submitBtn">
+            <i class="fas fa-sign-in-alt"></i> Sign In
+          </button>
+        </form>
+
+        <!-- Footer link -->
+        <div
+          style="
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+          "
+        >
+          <p style="font-size: 0.82rem; color: var(--text-3)">
+            Don't have an account?
+            <a
+              href="signup.html"
+              style="color: var(--accent-l); font-weight: 600; margin-left: 4px"
+            >
+              Create Admin Account
+              <i class="fas fa-arrow-right" style="font-size: 0.7rem"></i>
+            </a>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import { adminLogin } from "./js/auth.js";
+
+      const form = document.getElementById("loginForm");
+      const submitBtn = document.getElementById("submitBtn");
+      const errorMsg = document.getElementById("errorMessage");
+      const togglePw = document.getElementById("togglePw");
+      const toggleIcon = document.getElementById("togglePwIcon");
+      const pwInput = document.getElementById("password");
+
+      // ── Toggle password visibility ──
+      togglePw.addEventListener("click", () => {
+        const hidden = pwInput.type === "password";
+        pwInput.type = hidden ? "text" : "password";
+        toggleIcon.className = `fas fa-eye${hidden ? "-slash" : ""}`;
+      });
+
+      // ── Form submit ──
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const email = document.getElementById("email").value.trim();
+        const password = pwInput.value;
+
+        // Hide any existing error
+        errorMsg.style.display = "none";
+
+        // ── Show loading state ──
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Authenticating…`;
+
+        try {
+          const result = await adminLogin(email, password);
+
+          if (result.success) {
+            // ── Success state ──
+            submitBtn.classList.add("success");
+            submitBtn.innerHTML = `<i class="fas fa-check"></i> Success! Redirecting…`;
+
+            // Small delay so the user sees the success state
+            setTimeout(() => {
+              window.location.href = "dashboard.html";
+            }, 900);
+          } else {
+            // ── Error state ──
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> Sign In`;
+
+            errorMsg.textContent =
+              result.error || "Login failed. Please try again.";
+            errorMsg.style.display = "block";
+
+            // Shake animation on the card
+            const card = document.querySelector(".login-card");
+            card.style.animation = "shake .35s ease";
+            card.addEventListener(
+              "animationend",
+              () => (card.style.animation = ""),
+              { once: true },
+            );
+          }
+        } catch (err) {
+          // Unexpected error
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = `<i class="fas fa-sign-in-alt"></i> Sign In`;
+          errorMsg.textContent = `System error: ${err.message}`;
+          errorMsg.style.display = "block";
+        }
+      });
+
+      // Shake keyframe (injected once)
+      const style = document.createElement("style");
+      style.textContent = `
+            @keyframes shake {
+                0%,100% { transform:translateX(0); }
+                20%      { transform:translateX(-8px); }
+                40%      { transform:translateX(8px); }
+                60%      { transform:translateX(-5px); }
+                80%      { transform:translateX(5px); }
+            }
+        `;
+      document.head.appendChild(style);
     </script>
-</body>
+  </body>
 </html>

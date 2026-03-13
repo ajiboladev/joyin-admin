@@ -11,7 +11,7 @@ const firebaseConfig = {
   projectId: "joyin-001",
   storageBucket: "joyin-001.firebasestorage.app",
   messagingSenderId: "557041273144",
-  appId: "1:557041273144:web:a512b2e9df2c96b93399cd"
+  appId: "1:557041273144:web:a512b2e9df2c96b93399cd",
 };
 
 // Initialize Firebase
@@ -22,8 +22,9 @@ export const storage = getStorage(app);
 
 // Admin check function
 export async function isAdmin(userId) {
-    const { doc, getDoc } = await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
-    const adminRef = doc(db, "admins", userId);
-    const adminSnap = await getDoc(adminRef);
-    return adminSnap.exists();
+  const { doc, getDoc } =
+    await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
+  const adminRef = doc(db, "admins", userId);
+  const adminSnap = await getDoc(adminRef);
+  return adminSnap.exists();
 }

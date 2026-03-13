@@ -1,25 +1,81 @@
 // admin/js/posts.js
-import { auth, db, storage } from './firebase.js';
-import { checkAdminAuth } from './auth.js';
-import { 
-    doc, 
-    deleteDoc,
-    getDoc,
-    updateDoc,
-    increment,
-    writeBatch, 
-    collection,
-    getDocs,
-    query,
-    limit,
-    startAfter
+import { auth, db, storage } from "./firebase.js";
+import { checkAdminAuth } from "./auth.js";
+import {
+  doc,
+  deleteDoc,
+  getDoc,
+  updateDoc,
+  increment,
+  writeBatch,
+  collection,
+  getDocs,
+  query,
+  limit,
+  startAfter,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
-import { 
-    ref, 
-    deleteObject 
+import {
+  ref,
+  deleteObject,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js";
 
-// Delete post (with image, likes, and comments)
+import { deleteCloudinaryImage } from "./deleteCloudinary.js";
+
+// ── BATCH GET USERS ───────────────────────────────────────────────────────────
+/**
+ * Fetches multiple user documents by UID and returns them as a Map<uid, data>.
+ *
+ * Used by the Posts page to resolve usernames and profile pictures without
+ * storing that data on every post document.
+ *
+ * Fetches are run in parallel (capped at 30 per chunk to stay under limits).
+ *
+ * @param {string[]} userIds - Array of user UIDs (duplicates are ignored)
+ * @returns {Promise<Map<string, object>>} Map from uid → user document data
+ */
+export async function batchGetUsers(userIds) {
+  const unique = [...new Set(userIds)].filter(Boolean);
+  const cache = new Map();
+
+  if (!unique.length) return cache;
+
+  // Split into chunks of 30 and fetch all in parallel
+  const CHUNK = 30;
+  const chunks = [];
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    chunks.push(unique.slice(i, i + CHUNK));
+  }
+
+  await Promise.all(
+    chunks.map((chunk) =>
+      Promise.all(
+        chunk.map(async (uid) => {
+          try {
+            const snap = await getDoc(doc(db, "users", uid));
+            if (snap.exists()) cache.set(uid, snap.data());
+          } catch (e) {
+            console.warn(
+              `[batchGetUsers] Could not fetch user ${uid}:`,
+              e.message,
+            );
+          }
+        }),
+      ),
+    ),
+  );
+
+  console.log(`[batchGetUsers] Fetched ${cache.size} / ${unique.length} users`);
+  return cache;
+}
+
+// ── DELETE POST ───────────────────────────────────────────────────────────────
+/**
+ * Deletes a post along with all its subcollections (likes, comments, viewers)
+ * and its Cloudinary image. Also decrements counters on affected user documents.
+ *
+ * @param {string} postId
+ * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+ */
 export async function deletePost(postId) {
   try {
     const postRef = doc(db, "posts", postId);
@@ -34,77 +90,80 @@ export async function deletePost(postId) {
     const commentCount = postData.commentCount || 0;
     const postOwnerId = postData.userId;
 
-    // 1️⃣ Prepare first batch
+    // ── Batch 1: post + owner counters ──────────────────────────────────
     let batch = writeBatch(db);
     let writes = 0;
 
-    // Update post owner's likesCount if needed
     if (likeCount > 0 && postOwnerId) {
-      const userRef = doc(db, "users", postOwnerId);
-      batch.update(userRef, { likesCount: increment(-likeCount) });
+      batch.update(doc(db, "users", postOwnerId), {
+        likesCount: increment(-likeCount),
+      });
       writes++;
     }
 
-    // Delete the post itself
     batch.delete(postRef);
     writes++;
 
-    // 2️⃣ Delete likes subcollection in batches
-    const likesRef = collection(db, "posts", postId, "likes");
-    let lastLikeDoc = null;
+    // ── Helper: drain a subcollection in batches of 500 ─────────────────
+    async function drainSubcollection(colRef, label) {
+      let lastDoc = null;
 
-    while (true) {
-      let likesQuery = query(likesRef, limit(500 - writes));
-      if (lastLikeDoc) likesQuery = query(likesRef, startAfter(lastLikeDoc), limit(500 - writes));
+      while (true) {
+        let q = query(colRef, limit(500 - writes));
+        if (lastDoc)
+          q = query(colRef, startAfter(lastDoc), limit(500 - writes));
 
-      const likesSnap = await getDocs(likesQuery);
-      if (likesSnap.empty) break;
+        const snap = await getDocs(q);
+        if (snap.empty) break;
 
-      likesSnap.forEach((likeDoc) => {
-        batch.delete(likeDoc.ref);
-        writes++;
-      });
+        snap.forEach((d) => {
+          batch.delete(d.ref);
+          writes++;
+        });
 
-      lastLikeDoc = likesSnap.docs[likesSnap.docs.length - 1];
+        lastDoc = snap.docs[snap.docs.length - 1];
 
-      // Commit current batch if we reach 500 writes
-      if (writes >= 500) {
-        await batch.commit();
-        batch = writeBatch(db);
-        writes = 0;
+        if (writes >= 500) {
+          await batch.commit();
+          batch = writeBatch(db);
+          writes = 0;
+        }
       }
+
+      console.log(`✅ Drained subcollection [${label}] for post ${postId}`);
     }
 
-    console.log(`✅ Deleted ${likeCount} likes for post ${postId}`);
+    // ── Likes ────────────────────────────────────────────────────────────
+    await drainSubcollection(collection(db, "posts", postId, "likes"), "likes");
 
-    // 3️⃣ Delete comments subcollection in batches
+    // ── Viewers ──────────────────────────────────────────────────────────
+    await drainSubcollection(
+      collection(db, "posts", postId, "views"),
+      "viewers",
+    );
+
+    // ── Comments (track per-user counts) ─────────────────────────────────
     const commentsRef = collection(db, "posts", postId, "comments");
+    const commentUserIds = new Map();
     let lastCommentDoc = null;
-    const commentUserIds = new Map(); // Track comment count per user
 
     while (true) {
-      let commentsQuery = query(commentsRef, limit(500 - writes));
-      if (lastCommentDoc) commentsQuery = query(commentsRef, startAfter(lastCommentDoc), limit(500 - writes));
+      let q = query(commentsRef, limit(500 - writes));
+      if (lastCommentDoc)
+        q = query(commentsRef, startAfter(lastCommentDoc), limit(500 - writes));
 
-      const commentsSnap = await getDocs(commentsQuery);
-      if (commentsSnap.empty) break;
+      const snap = await getDocs(q);
+      if (snap.empty) break;
 
-      commentsSnap.forEach((commentDoc) => {
-        const commentData = commentDoc.data();
-        const commenterId = commentData.userId;
-        
-        // Track how many comments each user made
-        if (commenterId) {
-          commentUserIds.set(commenterId, (commentUserIds.get(commenterId) || 0) + 1);
-        }
-        
+      snap.forEach((commentDoc) => {
+        const uid = commentDoc.data().userId;
+        if (uid) commentUserIds.set(uid, (commentUserIds.get(uid) || 0) + 1);
         batch.delete(commentDoc.ref);
         writes++;
       });
 
-      lastCommentDoc = commentsSnap.docs[commentsSnap.docs.length - 1];
+      lastCommentDoc = snap.docs[snap.docs.length - 1];
 
-      // Commit current batch if we reach 500 writes
       if (writes >= 500) {
         await batch.commit();
         batch = writeBatch(db);
@@ -114,82 +173,71 @@ export async function deletePost(postId) {
 
     console.log(`✅ Deleted ${commentCount} comments for post ${postId}`);
 
-    // 4️⃣ Update comment counts for all commenters
-    for (const [userId, count] of commentUserIds) {
-      // Check if we need a new batch
+    // ── Decrement commentsCount on each commenter ─────────────────────────
+    for (const [uid, count] of commentUserIds) {
       if (writes >= 500) {
         await batch.commit();
         batch = writeBatch(db);
         writes = 0;
       }
-      
-      const userRef = doc(db, "users", userId);
-      batch.update(userRef, { commentsCount: increment(-count) });
+      batch.update(doc(db, "users", uid), { commentsCount: increment(-count) });
       writes++;
     }
 
-    console.log(`✅ Updated comment counts for ${commentUserIds.size} users`);
+    if (writes > 0) await batch.commit();
 
-    // Commit remaining batch
-    if (writes > 0) {
-      await batch.commit();
-    }
+    console.log(`✅ Post ${postId} fully deleted`);
 
-    console.log(`✅ Post ${postId}, all likes, and all comments deleted`);
-
-    // 5️⃣ Delete image from storage (cannot batch)
-    if (postData.imageUrl) {
+    // ── Cloudinary image cleanup ──────────────────────────────────────────
+    if (postData.cloudinaryId) {
       try {
-        const imagePath = decodeURIComponent(postData.imageUrl.split("/o/")[1]?.split("?")[0]);
-        if (imagePath) {
-          const imageRef = ref(storage, imagePath);
-          await deleteObject(imageRef);
-          console.log(`✅ Image deleted: ${imagePath}`);
-        }
-      } catch (storageError) {
-        console.warn("Could not delete image from storage:", storageError);
+        await deleteCloudinaryImage(postData.cloudinaryId);
+      } catch (err) {
+        console.error("Error deleting image from Cloudinary:", err);
       }
     }
 
-    return { 
-      success: true, 
-      message: `Post ${postId} deleted successfully (${likeCount} likes and ${commentCount} comments removed)` 
+    return {
+      success: true,
+      message: `Post deleted (${likeCount} likes, ${commentCount} comments removed)`,
     };
-
   } catch (error) {
     console.error("Error deleting post:", error);
     return { success: false, error: error.message };
   }
 }
 
-// Get post details
+// ── GET POST DETAILS ──────────────────────────────────────────────────────────
+
+/**
+ * Fetches a single post document.
+ *
+ * @param {string} postId
+ * @returns {Promise<{success: boolean, post?: object, error?: string}>}
+ */
 export async function getPostDetails(postId) {
-    try {
-        const postRef = doc(db, "posts", postId);
-        const postSnap = await getDoc(postRef);
-        
-        if (postSnap.exists()) {
-            return { 
-                success: true, 
-                post: { id: postSnap.id, ...postSnap.data() } 
-            };
-        } else {
-            return { success: false, error: "Post not found" };
-        }
-    } catch (error) {
-        return { success: false, error: error.message };
-    }
+  try {
+    const snap = await getDoc(doc(db, "posts", postId));
+    if (!snap.exists()) return { success: false, error: "Post not found" };
+    return { success: true, post: { id: snap.id, ...snap.data() } };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
-// Delete multiple posts
+// ── DELETE MULTIPLE POSTS ─────────────────────────────────────────────────────
+
+/**
+ * Deletes an array of posts sequentially, returning per-post results.
+ *
+ * @param {string[]} postIds
+ * @returns {Promise<Array<{postId: string, success: boolean, message?: string, error?: string}>>}
+ */
 export async function deleteMultiplePosts(postIds) {
-    const results = [];
-    for (const postId of postIds) {
-        const result = await deletePost(postId);
-        results.push({ postId, ...result });
-    }
-    return results;
+  const results = [];
+  for (const postId of postIds) {
+    const result = await deletePost(postId);
+    results.push({ postId, ...result });
+  }
+  return results;
 }
-
-
-// https://console.cloud.google.com/billing/01BDFD-69B718-989D39?authuser=1&organizationId=0(https://console.cloud.google.com/welcome?authuser=1&organizationId=0)
