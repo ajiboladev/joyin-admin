@@ -3,143 +3,135 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Feedback — JOYIN Admin</title>
-    <link rel="stylesheet" href="../css/admin.css" />
+    <title>Support Request — JOYIN Admin</title>
+    <link rel="stylesheet" href="css/admin.css" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
-    <link rel="icon" href="../J _ A192.png" />
+    <link rel="icon" href="/J _ A192.png" />
     <style>
-      .feedback-shell {
-        max-width: 980px;
+      .support-shell {
+        max-width: 1100px;
         margin: 0 auto;
       }
-      .category-tabs {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-        margin: 18px 0 16px;
-      }
-      .category-btn {
-        padding: 10px 18px;
-        border-radius: 999px;
-        border: 1px solid var(--border);
-        background: var(--surface-2);
-        color: var(--text-2);
-        font-weight: 700;
-        cursor: pointer;
-      }
-      .category-btn.active {
-        background: var(--accent);
-        color: #fff;
-        border-color: var(--accent);
-        box-shadow: 0 12px 30px rgba(91, 83, 242, 0.28);
-      }
-      .feedback-list {
+      .support-list {
         display: grid;
         gap: 16px;
-        margin-top: 18px;
+        margin-top: 20px;
       }
-      .feedback-card {
+      .support-card {
         background: var(--surface-1);
         border: 1px solid var(--border);
         border-radius: var(--r-lg);
         padding: 18px;
       }
-      .feedback-head {
+      .support-head {
         display: flex;
         justify-content: space-between;
+        align-items: center;
         gap: 12px;
         flex-wrap: wrap;
-        align-items: center;
       }
-      .feedback-meta {
+      .support-badges {
         display: flex;
+        align-items: center;
         gap: 8px;
         flex-wrap: wrap;
-        align-items: center;
-        color: var(--text-2);
-        font-size: 0.78rem;
       }
-      .feedback-badge {
+      .issue-pill {
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        background: var(--accent-dim);
+        padding: 5px 12px;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+        letter-spacing: 0.03em;
+        background: rgba(91, 83, 242, 0.12);
         color: var(--accent-l);
-        border: 1px solid rgba(91, 83, 242, 0.3);
-        border-radius: 999px;
-        padding: 4px 10px;
-        font-weight: 700;
-        font-size: 0.72rem;
+        border: 1px solid rgba(91, 83, 242, 0.25);
       }
-      .status-pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 4px 10px;
-        border-radius: 999px;
-        font-size: 0.72rem;
-        font-weight: 700;
+      .issue-pill.other {
+        background: rgba(148, 163, 184, 0.12);
+        color: #cbd5e1;
+        border-color: rgba(148, 163, 184, 0.2);
       }
-      .status-pill.replied {
+      .issue-pill.bug {
+        background: rgba(239, 68, 68, 0.12);
+        color: #fca5a5;
+        border-color: rgba(239, 68, 68, 0.25);
+      }
+      .issue-pill.account {
+        background: rgba(251, 146, 60, 0.12);
+        color: #fdba74;
+        border-color: rgba(251, 146, 60, 0.25);
+      }
+      .issue-pill.payment {
         background: rgba(34, 197, 94, 0.12);
-        color: var(--success);
-        border: 1px solid rgba(34, 197, 94, 0.3);
+        color: #86efac;
+        border-color: rgba(34, 197, 94, 0.25);
       }
-      .status-pill.pending {
-        background: rgba(245, 158, 11, 0.12);
-        color: var(--warning);
-        border: 1px solid rgba(245, 158, 11, 0.3);
+      .issue-pill.security {
+        background: rgba(236, 72, 153, 0.12);
+        color: #f9a8d4;
+        border-color: rgba(236, 72, 153, 0.25);
       }
-      .feedback-user-row,
-      .feedback-email-row {
+      .support-meta-row {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 10px;
         flex-wrap: wrap;
-        margin-top: 10px;
-        padding: 10px 12px;
+        padding: 12px 14px;
+        margin-top: 12px;
         background: var(--surface-2);
         border: 1px solid var(--border);
         border-radius: 12px;
       }
-      .feedback-user-row span,
-      .feedback-email-row span {
+      .support-meta-row span {
         color: var(--text-2);
-        font-size: 0.85rem;
+        font-size: 0.88rem;
         word-break: break-word;
       }
-      .feedback-text {
+      .support-issue-box {
         margin-top: 14px;
         padding: 14px 16px;
-        background: rgba(255, 255, 255, 0.02);
         border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.02);
         border-radius: 12px;
+      }
+      .support-issue-box strong,
+      .support-text-box strong {
+        display: block;
+        margin-bottom: 8px;
         color: var(--text);
-        line-height: 1.7;
+      }
+      .support-text-box {
+        margin-top: 14px;
+        padding: 14px 16px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.02);
+        border-radius: 12px;
+      }
+      .support-text-box p {
+        margin: 0;
+        color: var(--text);
+        line-height: 1.75;
         white-space: pre-wrap;
       }
-      .feedback-actions {
+      .support-actions {
         display: flex;
         justify-content: flex-end;
-        gap: 8px;
         margin-top: 14px;
       }
-      .copy-btn {
-        padding: 8px 10px;
-        min-width: 32px;
-      }
       .empty-state {
-        padding: 40px 20px;
+        padding: 50px 20px;
         text-align: center;
         color: var(--text-2);
       }
       @media (max-width: 600px) {
-        .feedback-user-row,
-        .feedback-email-row {
+        .support-meta-row {
           align-items: flex-start;
         }
       }
@@ -149,40 +141,40 @@
     <aside class="sidebar" id="sidebar">
       <div class="sidebar__logo"><i class="fas fa-crown"></i> JOYIN Admin</div>
       <nav class="sidebar__nav">
-        <a href="../dashboard.html" class="nav-link"
+        <a href="dashboard.html" class="nav-link"
           ><i class="fas fa-chart-line"></i> Dashboard</a
         >
-        <a href="../users.html" class="nav-link"
+        <a href="users.html" class="nav-link"
           ><i class="fas fa-users"></i> Users</a
         >
-        <a href="../posts.html" class="nav-link"
+        <a href="posts.html" class="nav-link"
           ><i class="fas fa-newspaper"></i> Posts</a
         >
-        <a href="./feedback-admin.html" class="nav-link active"
+        <a href="./Admin-feedback/feedback-admin.html" class="nav-link"
           ><i class="fas fa-comment-dots"></i> Feedback</a
         >
-        <a href="../support-request.html" class="nav-link"
+        <a href="support-request.html" class="nav-link active"
           ><i class="fas fa-headset"></i> Support request</a
         >
-        <a href="../updates/" class="nav-link"
+        <a href="./updates/" class="nav-link"
           ><i class="fas fa-bell"></i> Updates</a
         >
-        <a href="../video-posts/" class="nav-link"
+        <a href="video-posts/" class="nav-link"
           ><i class="fas fa-video"></i> Video Posts</a
         >
-        <a href="../content-search.html" class="nav-link"
+        <a href="content-search.html" class="nav-link"
           ><i class="fas fa-search"></i> Search Content</a
         >
-        <a href="../content-delete.html" class="nav-link"
+        <a href="content-delete.html" class="nav-link"
           ><i class="fas fa-trash"></i> Delete Content</a
         >
-        <a href="../delete-requests.html" class="nav-link"
+        <a href="delete-requests.html" class="nav-link"
           ><i class="fas fa-file-circle-xmark"></i> P-delete request</a
         >
-        <a href="../video-delete-requests.html" class="nav-link"
+        <a href="video-delete-requests.html" class="nav-link"
           ><i class="fas fa-video-slash"></i> V-delete request</a
         >
-        <a href="../account-delete-requests.html" class="nav-link"
+        <a href="account-delete-requests.html" class="nav-link"
           ><i class="fas fa-user-xmark"></i> Acc-delete request</a
         >
       </nav>
@@ -197,36 +189,32 @@
       <div class="topbar__title">
         <button class="hamburger" id="hamburger">
           <span></span><span></span><span></span></button
-        ><i class="fas fa-comment-dots"></i> Feedback
+        ><i class="fas fa-headset"></i> Support request
       </div>
     </header>
     <main class="page-content">
-      <div class="feedback-shell">
+      <div class="support-shell">
         <div class="card">
           <div class="card-header request-toolbar">
             <span class="card-title"
-              ><i class="fas fa-comment-dots"></i> Feedback inbox</span
+              ><i class="fas fa-headset"></i> Support requests</span
             >
+            <button id="fetchBtn" class="btn btn-primary">
+              <i class="fas fa-cloud-arrow-down"></i> Load support requests
+            </button>
           </div>
-          <div class="category-tabs">
-            <button class="category-btn active" data-category="ideas">
-              Ideas</button
-            ><button class="category-btn" data-category="bug">Bug</button
-            ><button class="category-btn" data-category="praise">Praise</button
-            ><button class="category-btn" data-category="others">Others</button>
-          </div>
-          <div id="feedbackList" class="feedback-list"></div>
+          <div id="requestList" class="support-list"></div>
           <div
             id="loadMoreWrap"
             style="display: none; text-align: center; margin-top: 18px"
           >
-            <button id="loadMoreBtn" class="btn btn-primary">
+            <button id="loadMoreBtn" class="btn">
               <i class="fas fa-plus"></i> Load more
             </button>
           </div>
         </div>
       </div>
     </main>
-    <script type="module" src="./feedback-admin.js"></script>
+    <script type="module" src="js/support-request-page.js"></script>
   </body>
 </html>
