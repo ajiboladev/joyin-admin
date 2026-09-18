@@ -20,6 +20,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-storage.js";
 
 import { deleteCloudinaryImage } from "./deleteCloudinary.js";
+import { finalizeContentDeletion } from "./content-tools.js";
 
 // ── BATCH GET USERS ───────────────────────────────────────────────────────────
 /**
@@ -77,6 +78,8 @@ export async function batchGetUsers(userIds) {
  * @returns {Promise<{success: boolean, message?: string, error?: string}>}
  */
 export async function deletePost(postId) {
+  return finalizeContentDeletion(postId, "post");
+  /* Legacy implementation retained below for reference. */
   try {
     const postRef = doc(db, "posts", postId);
     const postSnap = await getDoc(postRef);
@@ -86,7 +89,13 @@ export async function deletePost(postId) {
     }
 
     const postData = postSnap.data();
-    const likeCount = postData.likeCount || 0;
+    const likesCounterSnap = await getDoc(
+      doc(db, "posts", postId, "counters", "likes"),
+    );
+    const likesCounter = likesCounterSnap.exists()
+      ? likesCounterSnap.data()
+      : {};
+    const likeCount = Number(likesCounter.likesCount) || 0;
     const commentCount = postData.commentCount || 0;
     const postOwnerId = postData.userId;
 

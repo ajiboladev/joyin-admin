@@ -19,12 +19,13 @@ const app = initializeApp(firebaseConfig, "JOYIN-Admin");
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const storage = getStorage(app);
+export const ADMIN_COLLECTION = "joyinAccessRegistry";
 
 // Admin check function
 export async function isAdmin(userId) {
   const { doc, getDoc } =
     await import("https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js");
-  const adminRef = doc(db, "admins", userId);
+  const adminRef = doc(db, ADMIN_COLLECTION, userId);
   const adminSnap = await getDoc(adminRef);
   return adminSnap.exists();
 }

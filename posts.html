@@ -40,6 +40,21 @@
         <a href="./video-posts/" class="nav-link"
           ><i class="fas fa-video"></i> Video Posts</a
         >
+        <a href="content-search.html" class="nav-link"
+          ><i class="fas fa-search"></i> Search Content</a
+        >
+        <a href="content-delete.html" class="nav-link"
+          ><i class="fas fa-trash"></i> Delete Content</a
+        >
+        <a href="delete-requests.html" class="nav-link"
+          ><i class="fas fa-file-circle-xmark"></i> P-delete request</a
+        >
+        <a href="video-delete-requests.html" class="nav-link"
+          ><i class="fas fa-video-slash"></i> V-delete request</a
+        >
+        <a href="account-delete-requests.html" class="nav-link"
+          ><i class="fas fa-user-xmark"></i> Acc-delete request</a
+        >
       </nav>
       <div class="sidebar__footer">
         <button id="logoutBtn" class="logout-btn">
@@ -85,7 +100,7 @@
               type="text"
               id="searchInput"
               class="search-input"
-              placeholder="Search by content or username…"
+              placeholder="Search by content, username, or post ID…"
             />
           </div>
 
@@ -231,8 +246,12 @@
     </div>
 
     <script type="module">
-      import { getAllPosts } from "./js/dashboard.js";
+      import {
+        getPostsPage,
+        getPostManagementStats,
+      } from "./js/dashboard.js";
       import { deletePost, batchGetUsers } from "./js/posts.js";
+      import { openContentDeletionModal } from "./js/content-deletion-ui.js";
       import { adminLogout, checkAdminAuth } from "./js/auth.js";
       import {
         showToast,
@@ -254,10 +273,16 @@
 
       // ── State ──
       let allPosts = [];
+      let postStats = { total: 0, today: 0, withImages: 0 };
       let filteredPosts = [];
       let userCache = new Map(); // uid → { username, profilePic }
       let currentPage = 1;
       const PER_PAGE = 10;
+      let pageCursors = [null];
+      let pageCache = new Map();
+      let hasNextPage = false;
+      let totalPosts = 0;
+      let loadingPage = false;
       let selectedIds = new Set();
       let activeUserId =
         new URLSearchParams(location.search).get("user") || null;
@@ -290,24 +315,14 @@
       // FIELD HELPERS
       // ================================================================
 
-      /** Like count — handles numeric counter or array of user IDs. */
+      /** Like count loaded from posts/{postId}/counters/likes. */
       function getLikeCount(p) {
-        if (typeof p.likeCount === "number") return p.likeCount;
-        if (typeof p.likesCount === "number") return p.likesCount;
-        if (Array.isArray(p.likes)) return p.likes.length;
-        if (typeof p.likeCount === "string")
-          return parseInt(p.likeCount, 10) || 0;
-        return 0;
+        return Number(p.likesCount) || 0;
       }
 
-      /** View count — stored as viewCount on the post document. */
+      /** View count loaded from posts/{postId}/counters/views. */
       function getViewCount(p) {
-        if (typeof p.viewCount === "number") return p.viewCount;
-        if (typeof p.viewsCount === "number") return p.viewsCount;
-        if (typeof p.views === "number") return p.views;
-        if (typeof p.viewCount === "string")
-          return parseInt(p.viewCount, 10) || 0;
-        return 0;
+        return Number(p.viewsCount) || 0;
       }
 
       /**
@@ -317,8 +332,8 @@
       function getAuthor(p) {
         const cached = userCache.get(p.userId);
         return {
-          username:
-            cached?.username || cached?.displayName || p.username || "Unknown",
+          displayName: cached?.displayName || "",
+          username: cached?.username || p.username || "Unknown",
           profilePic:
             cached?.profilePic ||
             cached?.photoURL ||
@@ -334,12 +349,27 @@
       // LOAD
       // ================================================================
 
-      async function loadPosts() {
+      async function loadPosts(page = 1, force = false) {
+        if (loadingPage) return;
+        loadingPage = true;
         document.getElementById("postsBody").innerHTML = skeletonRows(7, 7);
 
         try {
-          // 1. Fetch all posts
-          allPosts = await getAllPosts();
+          let pageData = !force ? pageCache.get(page) : null;
+          if (!pageData) {
+            const [postsData, statsData] = await Promise.all([
+              getPostsPage(pageCursors[page - 1] || null, PER_PAGE),
+              getPostManagementStats(),
+            ]);
+            pageData = postsData;
+            postStats = statsData;
+            pageCache.set(page, pageData);
+            pageCursors[page] = pageData.nextCursor;
+          }
+          allPosts = pageData.posts;
+          currentPage = page;
+          hasNextPage = pageData.hasNextPage;
+          totalPosts = pageData.totalCount;
 
           // 2. Batch-fetch every unique author in parallel
           //    This resolves usernames + profile pics without storing
@@ -362,6 +392,7 @@
                         Failed to load — <button onclick="location.reload()" style="color:var(--accent-l);background:none;border:none;cursor:pointer;text-decoration:underline;">retry</button>
                     </td></tr>`;
         }
+        loadingPage = false;
       }
 
       // ================================================================
@@ -369,43 +400,20 @@
       // ================================================================
 
       function renderStats() {
-        const today = new Date().toDateString();
-        const todayCount = allPosts.filter((p) => {
-          const d = toDate(p.createdAt);
-          return d && d.toDateString() === today;
-        }).length;
-
-        const withImg = allPosts.filter((p) => p.imageUrl?.trim()).length;
-        const totalLikes = allPosts.reduce((s, p) => s + getLikeCount(p), 0);
-        const totalViews = allPosts.reduce((s, p) => s + getViewCount(p), 0);
-        const avgLikes = allPosts.length
-          ? (totalLikes / allPosts.length).toFixed(1)
-          : 0;
-
         document.getElementById("postStats").innerHTML = `
                 <div class="stat-card">
                     <div class="stat-card__icon"><i class="fas fa-newspaper"></i></div>
-                    <div class="stat-value">${allPosts.length.toLocaleString()}</div>
+                    <div class="stat-value">${postStats.total.toLocaleString()}</div>
                     <div class="stat-label">Total Posts</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-card__icon"><i class="fas fa-calendar-day"></i></div>
-                    <div class="stat-value">${todayCount}</div>
+                    <div class="stat-value">${postStats.today}</div>
                     <div class="stat-label">Posts Today</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-card__icon"><i class="fas fa-eye"></i></div>
-                    <div class="stat-value">${totalViews.toLocaleString()}</div>
-                    <div class="stat-label">Total Views</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-card__icon"><i class="fas fa-heart"></i></div>
-                    <div class="stat-value">${avgLikes}</div>
-                    <div class="stat-label">Avg Likes</div>
-                </div>
-                <div class="stat-card">
                     <div class="stat-card__icon"><i class="fas fa-image"></i></div>
-                    <div class="stat-value">${withImg}</div>
+                    <div class="stat-value">${postStats.withImages}</div>
                     <div class="stat-label">With Images</div>
                 </div>
             `;
@@ -455,13 +463,14 @@
         if (activeUserId)
           posts = posts.filter((p) => p.userId === activeUserId);
 
-        // Search — checks post text AND resolved username from cache
+        // Search checks content, username, and the post document ID.
         if (term) {
           posts = posts.filter((p) => {
             const author = getAuthor(p);
             return (
               (p.text || "").toLowerCase().includes(term) ||
-              author.username.toLowerCase().includes(term)
+              author.username.toLowerCase().includes(term) ||
+              p.id.toLowerCase().includes(term)
             );
           });
         }
@@ -484,7 +493,6 @@
         }
 
         filteredPosts = posts;
-        currentPage = 1;
       }
 
       // ================================================================
@@ -493,24 +501,21 @@
 
       function renderTable() {
         const tbody = document.getElementById("postsBody");
-        const start = (currentPage - 1) * PER_PAGE;
-        const end = start + PER_PAGE;
-        const page = filteredPosts.slice(start, end);
+        const page = filteredPosts;
 
         document.getElementById("postCountBadge").textContent =
-          filteredPosts.length;
+          totalPosts;
         document.getElementById("totalCount").textContent =
-          filteredPosts.length;
+          totalPosts;
         document.getElementById("showingFrom").textContent =
-          filteredPosts.length ? start + 1 : 0;
+          filteredPosts.length ? (currentPage - 1) * PER_PAGE + 1 : 0;
         document.getElementById("showingTo").textContent = Math.min(
-          end,
-          filteredPosts.length,
+          currentPage * PER_PAGE,
+          (currentPage - 1) * PER_PAGE + filteredPosts.length,
         );
-        document.getElementById("pageInfo").textContent = `Page ${currentPage}`;
+        document.getElementById("pageInfo").textContent = `Page ${currentPage} of ${Math.max(1, Math.ceil(totalPosts / PER_PAGE))}`;
         document.getElementById("prevPage").disabled = currentPage === 1;
-        document.getElementById("nextPage").disabled =
-          end >= filteredPosts.length;
+        document.getElementById("nextPage").disabled = !hasNextPage;
 
         if (!page.length) {
           tbody.innerHTML = `
@@ -533,7 +538,7 @@
             const likes = getLikeCount(p);
             const views = getViewCount(p);
 
-            // Resolve username + pic from cache — NOT from post document
+            // Resolve display name, username, and pic from the user cache.
             const author = getAuthor(p);
 
             return `
@@ -549,7 +554,10 @@
                         <div class="flex-center gap-8">
                             <img src="${author.profilePic}" class="avatar" style="width:30px;height:30px;"
                                  onerror="this.src='${FALLBACK_AVATAR}'">
-                            <span class="text-sm">${author.username}</span>
+                            <div>
+                              <strong class="text-sm">${author.displayName || author.username}</strong>
+                              ${author.displayName && author.username ? `<div class="text-xs" style="color:var(--text-3);">@${author.username}</div>` : ""}
+                            </div>
                         </div>
                     </td>
                     <td class="text-sm text-muted">
@@ -634,10 +642,7 @@
       document
         .getElementById("selectAll")
         .addEventListener("change", function () {
-          const page = filteredPosts.slice(
-            (currentPage - 1) * PER_PAGE,
-            currentPage * PER_PAGE,
-          );
+          const page = filteredPosts;
           page.forEach((p) => {
             if (this.checked) selectedIds.add(p.id);
             else selectedIds.delete(p.id);
@@ -653,34 +658,11 @@
       // ================================================================
 
       window.deleteSingle = async function (postId, btn) {
-        const confirmed = await showConfirm({
-          title: "Delete this post?",
-          message:
-            "This cannot be undone. The post, all likes, and all comments will be removed.",
-          confirmText: "Delete",
-          intent: "danger",
+        await openContentDeletionModal({
+          id: postId,
+          type: "post",
+          onDeleted: () => loadPosts(currentPage, true),
         });
-        if (!confirmed) return;
-
-        const restore = setButtonLoading(btn, "");
-        showLoading("Deleting post…");
-        try {
-          const result = await deletePost(postId);
-          if (result.success) {
-            showToast("Post deleted.", "success");
-            allPosts = allPosts.filter((p) => p.id !== postId);
-            applyFilters();
-            renderStats();
-            renderTable();
-          } else {
-            showToast("Error: " + result.error, "error");
-          }
-        } catch (err) {
-          showToast("Unexpected error.", "error");
-        } finally {
-          hideLoading();
-          restore();
-        }
       };
 
       // ================================================================
@@ -744,7 +726,8 @@
                          style="width:50px;height:50px;border-radius:50%;object-fit:cover;"
                          onerror="this.src='${FALLBACK_AVATAR}'">
                     <div>
-                        <strong>${author.username}</strong>
+                        <strong>${author.displayName || author.username}</strong>
+                        ${author.displayName && author.username ? `<div class="text-xs" style="color:var(--text-3);">@${author.username}</div>` : ""}
                         <div class="text-xs text-muted">${d ? d.toLocaleString() : "—"}</div>
                     </div>
                 </div>
@@ -822,6 +805,15 @@
         document
           .getElementById("modalDeleteBtn")
           .addEventListener("click", async function () {
+            await openContentDeletionModal({
+              id: p.id,
+              type: "post",
+              onDeleted: () => {
+                document.getElementById("postModal").classList.remove("open");
+                return loadPosts(currentPage, true);
+              },
+            });
+            return;
             const confirmed = await showConfirm({
               title: "Delete this post?",
               message: "This cannot be undone.",
@@ -867,13 +859,11 @@
       // PAGINATION
       // ================================================================
 
-      document.getElementById("prevPage").addEventListener("click", () => {
-        currentPage--;
-        renderTable();
+      document.getElementById("prevPage").addEventListener("click", async () => {
+        await loadPosts(currentPage - 1);
       });
-      document.getElementById("nextPage").addEventListener("click", () => {
-        currentPage++;
-        renderTable();
+      document.getElementById("nextPage").addEventListener("click", async () => {
+        await loadPosts(currentPage + 1);
       });
 
       // ================================================================

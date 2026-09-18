@@ -5,11 +5,16 @@
 
 import { auth, db } from "./firebase.js";
 import {
+  doc,
+  getDoc,
   collection,
   getDocs,
   getCountFromServer,
   query,
   orderBy,
+  limit,
+  startAfter,
+  where,
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 // ── FETCH ALL USERS ───────────────────────────────────────────
@@ -21,7 +26,84 @@ import {
  */
 export async function getAllUsers() {
   const snapshot = await getDocs(collection(db, "users"));
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return Promise.all(
+    snapshot.docs.map(async (userDoc) => {
+      const user = { id: userDoc.id, ...userDoc.data() };
+      const [accountSnap, postsCounterSnap, followersCounterSnap] =
+        await Promise.all([
+          getDoc(doc(db, "users", userDoc.id, "privacy", "account")),
+          getDoc(doc(db, "users", userDoc.id, "counters", "posts")),
+          getDoc(doc(db, "users", userDoc.id, "counters", "followers")),
+        ]);
+
+      const account = accountSnap.exists() ? accountSnap.data() : {};
+      const postsCounter = postsCounterSnap.exists()
+        ? postsCounterSnap.data()
+        : {};
+      const followersCounter = followersCounterSnap.exists()
+        ? followersCounterSnap.data()
+        : {};
+
+      return {
+        ...user,
+        displayName: user.displayName || "",
+        email: account.email || "",
+        postsCount: Number(postsCounter.postsCount) || 0,
+        videosCount: Number(postsCounter.videosCount) || 0,
+        followersCount: Number(followersCounter.followersCount) || 0,
+      };
+    }),
+  );
+}
+
+export async function getUsersPage(cursor = null, pageSize = 10) {
+  const [totalSnapshot, snapshot] = await Promise.all([
+    getCountFromServer(collection(db, "users")),
+    getDocs(
+      query(
+        collection(db, "users"),
+        ...(cursor
+          ? [orderBy("createdAt", "desc"), startAfter(cursor), limit(pageSize + 1)]
+          : [orderBy("createdAt", "desc"), limit(pageSize + 1)]),
+      ),
+    ),
+  ]);
+  const hasNextPage = snapshot.docs.length > pageSize;
+  const docs = snapshot.docs.slice(0, pageSize);
+
+  const users = await Promise.all(
+    docs.map(async (userDoc) => {
+      const user = { id: userDoc.id, ...userDoc.data() };
+      const [accountSnap, postsCounterSnap, followersCounterSnap] =
+        await Promise.all([
+          getDoc(doc(db, "users", userDoc.id, "privacy", "account")),
+          getDoc(doc(db, "users", userDoc.id, "counters", "posts")),
+          getDoc(doc(db, "users", userDoc.id, "counters", "followers")),
+        ]);
+      const account = accountSnap.exists() ? accountSnap.data() : {};
+      const postsCounter = postsCounterSnap.exists()
+        ? postsCounterSnap.data()
+        : {};
+      const followersCounter = followersCounterSnap.exists()
+        ? followersCounterSnap.data()
+        : {};
+      return {
+        ...user,
+        displayName: user.displayName || "",
+        email: account.email || "",
+        postsCount: Number(postsCounter.postsCount) || 0,
+        videosCount: Number(postsCounter.videosCount) || 0,
+        followersCount: Number(followersCounter.followersCount) || 0,
+      };
+    }),
+  );
+
+  return {
+    users,
+    nextCursor: hasNextPage ? docs[docs.length - 1] : null,
+    hasNextPage,
+    totalCount: totalSnapshot.data().count,
+  };
 }
 
 // ── FETCH ALL POSTS ───────────────────────────────────────────
@@ -36,7 +118,63 @@ export async function getAllUsers() {
 export async function getAllPosts() {
   const q = query(collection(db, "posts"), orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
-  return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return Promise.all(
+    snapshot.docs.map(async (postDoc) => {
+      const [likesSnap, viewsSnap] = await Promise.all([
+        getDoc(doc(db, "posts", postDoc.id, "counters", "likes")),
+        getDoc(doc(db, "posts", postDoc.id, "counters", "views")),
+      ]);
+      const likes = likesSnap.exists() ? likesSnap.data() : {};
+      const views = viewsSnap.exists() ? viewsSnap.data() : {};
+
+      return {
+        id: postDoc.id,
+        ...postDoc.data(),
+        likesCount: Number(likes.likesCount) || 0,
+        viewsCount: Number(views.viewsCount) || 0,
+      };
+    }),
+  );
+}
+
+export async function getPostsPage(cursor = null, pageSize = 10) {
+  const [totalSnapshot, snapshot] = await Promise.all([
+    getCountFromServer(collection(db, "posts")),
+    getDocs(
+      query(
+        collection(db, "posts"),
+        ...(cursor
+          ? [orderBy("createdAt", "desc"), startAfter(cursor), limit(pageSize + 1)]
+          : [orderBy("createdAt", "desc"), limit(pageSize + 1)]),
+      ),
+    ),
+  ]);
+  const hasNextPage = snapshot.docs.length > pageSize;
+  const docs = snapshot.docs.slice(0, pageSize);
+  const posts = await Promise.all(
+    docs.map(async (postDoc) => {
+      const [likesSnap, viewsSnap] = await Promise.all([
+        getDoc(doc(db, "posts", postDoc.id, "counters", "likes")),
+        getDoc(doc(db, "posts", postDoc.id, "counters", "views")),
+      ]);
+      return {
+        id: postDoc.id,
+        ...postDoc.data(),
+        likesCount: likesSnap.exists()
+          ? Number(likesSnap.data().likesCount) || 0
+          : 0,
+        viewsCount: viewsSnap.exists()
+          ? Number(viewsSnap.data().viewsCount) || 0
+          : 0,
+      };
+    }),
+  );
+  return {
+    posts,
+    nextCursor: hasNextPage ? docs[docs.length - 1] : null,
+    hasNextPage,
+    totalCount: totalSnapshot.data().count,
+  };
 }
 
 // ── FETCH ALL VIDEO POSTS ─────────────────────────────────────
@@ -52,6 +190,88 @@ export async function getAllVideoPosts() {
   const q = query(collection(db, "video-posts"), orderBy("createdAt", "desc"));
   const snapshot = await getDocs(q);
   return snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+export async function getVideoPostsPage(cursor = null, pageSize = 20) {
+  const today = new Date();
+  const startOfDay = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const [totalSnapshot, todaySnapshot, snapshot] = await Promise.all([
+    getCountFromServer(collection(db, "video-posts")),
+    getCountFromServer(
+      query(collection(db, "video-posts"), where("createdAt", ">=", startOfDay)),
+    ),
+    getDocs(
+      query(
+        collection(db, "video-posts"),
+        ...(cursor
+          ? [orderBy("createdAt", "desc"), startAfter(cursor), limit(pageSize + 1)]
+          : [orderBy("createdAt", "desc"), limit(pageSize + 1)]),
+      ),
+    ),
+  ]);
+  const hasNextPage = snapshot.docs.length > pageSize;
+  const docs = snapshot.docs.slice(0, pageSize);
+  return {
+    posts: await Promise.all(
+      docs.map(async (videoDoc) => {
+        const [likesSnap, commentsSnap, viewsSnap] = await Promise.all([
+          getDoc(doc(db, "video-posts", videoDoc.id, "counters", "likes")),
+          getDoc(doc(db, "video-posts", videoDoc.id, "counters", "comments")),
+          getDoc(doc(db, "video-posts", videoDoc.id, "counters", "views")),
+        ]);
+        return {
+          id: videoDoc.id,
+          ...videoDoc.data(),
+          likesCount: likesSnap.exists()
+            ? Number(likesSnap.data().likesCount) || 0
+            : 0,
+          commentsCount: commentsSnap.exists()
+            ? Number(commentsSnap.data().commentsCount) || 0
+            : 0,
+          viewsCount: viewsSnap.exists()
+            ? Number(viewsSnap.data().viewsCount) || 0
+            : 0,
+        };
+      }),
+    ),
+    nextCursor: hasNextPage ? docs[docs.length - 1] : null,
+    hasNextPage,
+    totalCount: totalSnapshot.data().count,
+    todayCount: todaySnapshot.data().count,
+  };
+}
+
+export async function getPostManagementStats() {
+  const today = new Date();
+  const startOfDay = new Date(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate(),
+  );
+  const collections = ["posts", "video-posts"];
+  const [totalPosts, totalVideos, todayPosts, todayVideos, withImages] =
+    await Promise.all([
+      getCountFromServer(collection(db, collections[0])),
+      getCountFromServer(collection(db, collections[1])),
+      getCountFromServer(
+        query(collection(db, collections[0]), where("createdAt", ">=", startOfDay)),
+      ),
+      getCountFromServer(
+        query(collection(db, collections[1]), where("createdAt", ">=", startOfDay)),
+      ),
+      getCountFromServer(
+        query(collection(db, collections[0]), where("imageUrl", "!=", "")),
+      ),
+    ]);
+  return {
+    total: totalPosts.data().count + totalVideos.data().count,
+    today: todayPosts.data().count + todayVideos.data().count,
+    withImages: withImages.data().count,
+  };
 }
 
 // ── SERVER-SIDE COUNTS ────────────────────────────────────────
@@ -132,7 +352,7 @@ export async function getAdminStatsFixed() {
 
   // ── User breakdown ──
   const bannedUsers = users.filter(
-    (u) => u.softBan === true || u.softBan === "true",
+    (u) => u.isBanned === true,
   ).length;
   const activeUsers = users.length - bannedUsers;
   const newUsersToday = users.filter((u) => {

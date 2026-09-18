@@ -41,6 +41,21 @@
         <a href="./index.html" class="nav-link active"
           ><i class="fas fa-video"></i> Video Posts</a
         >
+        <a href="../content-search.html" class="nav-link"
+          ><i class="fas fa-search"></i> Search Content</a
+        >
+        <a href="../content-delete.html" class="nav-link"
+          ><i class="fas fa-trash"></i> Delete Content</a
+        >
+        <a href="../delete-requests.html" class="nav-link"
+          ><i class="fas fa-file-circle-xmark"></i> P-delete request</a
+        >
+        <a href="../video-delete-requests.html" class="nav-link"
+          ><i class="fas fa-video-slash"></i> V-delete request</a
+        >
+        <a href="../account-delete-requests.html" class="nav-link"
+          ><i class="fas fa-user-xmark"></i> Acc-delete request</a
+        >
       </nav>
       <div class="sidebar__footer">
         <button id="logoutBtn" class="logout-btn">
@@ -89,47 +104,6 @@
           <div class="stat-value" id="statToday">—</div>
           <div class="stat-label">Today</div>
         </div>
-        <!-- NEW: Total Views stat card -->
-        <div class="stat-card">
-          <div
-            class="stat-card__icon"
-            style="background: rgba(91, 83, 242, 0.15)"
-          >
-            <i class="fas fa-eye" style="color: var(--accent-l)"></i>
-          </div>
-          <div class="stat-value" id="statViews">—</div>
-          <div class="stat-label">Total Views</div>
-        </div>
-        <div class="stat-card">
-          <div
-            class="stat-card__icon"
-            style="background: rgba(239, 68, 68, 0.1)"
-          >
-            <i class="fas fa-heart" style="color: #f87171"></i>
-          </div>
-          <div class="stat-value" id="statLikes">—</div>
-          <div class="stat-label">Total Likes</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__icon"><i class="fas fa-comment"></i></div>
-          <div class="stat-value" id="statComments">—</div>
-          <div class="stat-label">Comments</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-card__icon"><i class="fas fa-users"></i></div>
-          <div class="stat-value" id="statUsers">—</div>
-          <div class="stat-label">Creators</div>
-        </div>
-        <div class="stat-card stat-card--storage">
-          <div
-            class="stat-card__icon"
-            style="background: rgba(239, 68, 68, 0.1)"
-          >
-            <i class="fas fa-database" style="color: #f87171"></i>
-          </div>
-          <div class="stat-value" id="statStorage">—</div>
-          <div class="stat-label">Storage Used</div>
-        </div>
       </div>
 
       <!-- ── TOOLBAR ── -->
@@ -165,7 +139,6 @@
             <option value="viewCount-desc">Most viewed</option>
             <option value="commentCount-desc">Most commented</option>
             <option value="duration-desc">Longest videos</option>
-            <option value="fileSize-desc">Largest files</option>
           </select>
 
           <!-- ── VIEW TOGGLE ── -->
@@ -224,7 +197,6 @@
                 <th>Likes</th>
                 <th>Views</th>
                 <th>Comments</th>
-                <th>Size</th>
                 <th>Actions</th>
               </tr>
             </thead>

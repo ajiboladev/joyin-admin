@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en" data-request-collection="request-post-delete" data-request-title="P-delete request" data-request-kind="post">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>P-delete request — JOYIN Admin</title>
+    <link rel="stylesheet" href="css/admin.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="icon" href="/J _ A192.png" />
+    <style>
+      .request-shell { max-width: 980px; margin: 0 auto; }
+      .request-toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+      .request-list { display:grid; gap:10px; margin-top:20px; }
+      .request-row { display:grid; grid-template-columns:1fr auto; gap:16px; align-items:center; padding:16px 18px; background:var(--surface-1); border:1px solid var(--border); border-radius:var(--r-md); }
+      .request-meta { display:flex; gap:14px; flex-wrap:wrap; color:var(--text-2); font-size:.84rem; margin-bottom:9px; }
+      .request-meta i { color:var(--accent-l); margin-right:5px; }
+      .request-link { color:var(--accent-l); overflow-wrap:anywhere; font-size:.86rem; }
+      .request-actions { display:flex; gap:7px; }
+      .empty-state { padding:50px 20px; text-align:center; color:var(--text-2); }
+      @media (max-width:600px) { .request-row { grid-template-columns:1fr; } .request-actions { justify-content:flex-end; } }
+    </style>
+  </head>
+  <body>
+    <aside class="sidebar" id="sidebar"><div class="sidebar__logo"><i class="fas fa-crown"></i> JOYIN Admin</div><nav class="sidebar__nav"><a href="dashboard.html" class="nav-link"><i class="fas fa-chart-line"></i> Dashboard</a><a href="users.html" class="nav-link"><i class="fas fa-users"></i> Users</a><a href="posts.html" class="nav-link"><i class="fas fa-newspaper"></i> Posts</a><a href="video-posts/" class="nav-link"><i class="fas fa-video"></i> Video Posts</a><a href="content-search.html" class="nav-link"><i class="fas fa-search"></i> Search Content</a><a href="content-delete.html" class="nav-link"><i class="fas fa-trash"></i> Delete Content</a><a href="delete-requests.html" class="nav-link active"><i class="fas fa-file-circle-xmark"></i> P-delete request</a><a href="video-delete-requests.html" class="nav-link"><i class="fas fa-video-slash"></i> V-delete request</a></nav><div class="sidebar__footer"><button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button></div></aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <header class="topbar"><div class="topbar__title"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><i class="fas fa-file-circle-xmark"></i> P-delete request</div></header>
+    <main class="page-content"><div class="request-shell"><div class="card"><div class="card-header request-toolbar"><span class="card-title"><i class="fas fa-inbox"></i> Post deletion requests</span><button id="fetchBtn" class="btn btn-primary"><i class="fas fa-cloud-arrow-down"></i> Fetch post deletion requests</button></div></div><div id="requestList" class="request-list"></div><div id="loadMoreWrap" style="display:none;text-align:center;margin-top:18px"><button id="loadMoreBtn" class="btn"><i class="fas fa-plus"></i> Load more</button></div></div></main>
+    <script type="module" src="js/delete-request-page.js"></script>
+  </body>
+</html>

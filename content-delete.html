@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Delete Content — JOYIN Admin</title>
+    <link rel="stylesheet" href="css/admin.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="icon" href="/J _ A192.png" />
+    <style>
+      .tool-shell { max-width: 980px; margin: 0 auto; font-size: 16px; }
+      .tool-shell h2 { font-size: 16px; }
+      .delete-form { display: grid; grid-template-columns: 220px 1fr auto; gap: 10px; align-items: end; }
+      .result-card { margin-top: 20px; }
+      .result-body { padding: 20px; }
+      .media-frame { min-height: 160px; max-width: 720px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; padding: 14px; margin: 16px 0; overflow: hidden; }
+      .media-frame img, .media-frame video { display:block; max-width:100%; max-height:520px; width:auto; height:auto; object-fit:contain; }
+      .metric-row { display:flex; flex-wrap:wrap; gap:18px; color:var(--text-2); font-size:.85rem; }
+      .metric-row i { color:var(--accent-l); margin-right:5px; }
+      .warning { color:#f87171; background:var(--danger-dim); border:1px solid rgba(239,68,68,.25); padding:12px; border-radius:var(--r-md); margin:16px 0; }
+      @media (max-width:700px) { .delete-form { grid-template-columns:1fr; } }
+    </style>
+  </head>
+  <body>
+    <aside class="sidebar" id="sidebar"><div class="sidebar__logo"><i class="fas fa-crown"></i> JOYIN Admin</div><nav class="sidebar__nav"><a href="dashboard.html" class="nav-link"><i class="fas fa-chart-line"></i> Dashboard</a><a href="users.html" class="nav-link"><i class="fas fa-users"></i> Users</a><a href="posts.html" class="nav-link"><i class="fas fa-newspaper"></i> Posts</a><a href="video-posts/" class="nav-link"><i class="fas fa-video"></i> Video Posts</a><a href="content-search.html" class="nav-link"><i class="fas fa-search"></i> Search Content</a><a href="content-delete.html" class="nav-link active"><i class="fas fa-trash"></i> Delete Content</a><a href="delete-requests.html" class="nav-link"><i class="fas fa-file-circle-xmark"></i> P-delete request</a><a href="video-delete-requests.html" class="nav-link"><i class="fas fa-video-slash"></i> V-delete request</a><a href="account-delete-requests.html" class="nav-link"><i class="fas fa-user-xmark"></i> Acc-delete request</a></nav><div class="sidebar__footer"><button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button></div></aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <header class="topbar"><div class="topbar__title"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><i class="fas fa-trash"></i> Delete Content</div></header>
+    <main class="page-content"><div class="tool-shell">
+      <div class="card"><div class="card-header"><span class="card-title"><i class="fas fa-skull-crossbones"></i> Find content to delete</span></div><form id="deleteForm" class="delete-form" style="padding:20px"><div><label class="form-label" for="deleteType">Content type</label><select id="deleteType" class="form-input"><option value="post">Text & image post</option><option value="video">Video post</option></select></div><div><label class="form-label" for="deleteId">Document ID</label><input id="deleteId" class="form-input" placeholder="Paste the content ID" required /></div><button class="btn btn-danger" type="submit"><i class="fas fa-search"></i> Find</button></form></div>
+      <div id="result" class="result-card"></div>
+    </div></main>
+    <script type="module">
+      import { checkAdminAuth, adminLogout } from "./js/auth.js";
+      import { setupSidebar, showConfirm, showToast, showLoading, hideLoading } from "./js/ui.js";
+      import { findPost, deleteContent, extractContentId } from "./js/content-tools.js";
+      import { openContentDeletionModal } from "./js/content-deletion-ui.js";
+      const admin = await checkAdminAuth(); if (!admin) window.location.href = "index.html";
+      document.getElementById("logoutBtn").addEventListener("click", adminLogout); setupSidebar();
+      const result = document.getElementById("result"); const esc = (value = "") => { const node = document.createElement("div"); node.textContent = value; return node.innerHTML; };
+      result.addEventListener("click", async (event) => { const button = event.target.closest("#confirmDelete"); if (!button) return; event.preventDefault(); event.stopImmediatePropagation(); const type = document.getElementById("deleteType").value; const id = extractContentId(document.getElementById("deleteId").value); await openContentDeletionModal({ id, type, onDeleted: () => { result.innerHTML = `<div class="card"><div class="result-body"><p class="text-faint">Content deleted successfully.</p></div></div>`; } }); }, true);
+      function render(post) { const type = post.type; const media = type === "video" && post.videoUrl ? `<div class="media-frame"><span class="media-loading">Loading video...</span><video controls playsinline preload="metadata" poster="${esc(post.thumbnailUrl || "")}" src="${esc(post.videoUrl)}" onloadeddata="this.previousElementSibling.remove()" onerror="this.previousElementSibling.textContent='Video unavailable'"></video></div>` : type !== "video" && post.imageUrl ? `<div class="media-frame"><span class="media-loading">Loading image...</span><img src="${esc(post.imageUrl)}" alt="Content media" onload="this.previousElementSibling.remove()" onerror="this.previousElementSibling.textContent='Media unavailable'"></div>` : ""; result.innerHTML = `<div class="card"><div class="result-body"><div class="muted">${type === "video" ? "Video post" : "Text & image post"} · ID: ${esc(post.id)}</div><h2 style="margin:10px 0">${esc(post.text || post.caption || "No caption")}</h2>${media}<div class="metric-row"><span><i class="fas fa-heart"></i>${post.likesCount || 0} likes</span><span><i class="fas fa-comment"></i>${post.commentsCount || 0} comments</span><span><i class="fas fa-eye"></i>${post.viewsCount || 0} views</span></div><div class="warning"><i class="fas fa-triangle-exclamation"></i> Deleting this content is permanent.</div><button id="confirmDelete" class="btn btn-danger"><i class="fas fa-trash"></i> Delete permanently</button></div></div>`; document.getElementById("confirmDelete").addEventListener("click", async () => { const confirmed = await showConfirm({ title: "Delete this content?", message: "This cannot be undone.", confirmText: "Delete permanently", intent: "danger" }); if (!confirmed) return; showLoading("Deleting content..."); try { const response = await deleteContent(post.id, type); if (!response.success) throw new Error(response.error); result.innerHTML = `<div class="card"><div class="result-body"><p class="text-faint">Content deleted successfully.</p></div></div>`; showToast("Content deleted.", "success"); } catch (error) { showToast("Delete failed: " + error.message, "error"); } finally { hideLoading(); } }); }
+      document.getElementById("deleteForm").addEventListener("submit", async (event) => { event.preventDefault(); const type = document.getElementById("deleteType").value; const id = extractContentId(document.getElementById("deleteId").value); if (!id) return; result.innerHTML = `<div class="card"><div class="result-body"><div class="spinner" style="margin:auto"></div></div></div>`; try { const post = await findPost(id, type); if (!post) { result.innerHTML = `<div class="card"><div class="result-body"><p class="text-faint">${type === "video" ? "Video post" : "Post"} not found.</p></div></div>`; return; } render(post); } catch (error) { showToast("Lookup failed: " + error.message, "error"); } });
+    </script>
+  </body>
+</html>

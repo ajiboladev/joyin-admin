@@ -40,6 +40,21 @@
         <a href="./video-posts/" class="nav-link"
           ><i class="fas fa-video"></i> Video Posts</a
         >
+        <a href="content-search.html" class="nav-link"
+          ><i class="fas fa-search"></i> Search Content</a
+        >
+        <a href="content-delete.html" class="nav-link"
+          ><i class="fas fa-trash"></i> Delete Content</a
+        >
+        <a href="delete-requests.html" class="nav-link"
+          ><i class="fas fa-file-circle-xmark"></i> P-delete request</a
+        >
+        <a href="video-delete-requests.html" class="nav-link"
+          ><i class="fas fa-video-slash"></i> V-delete request</a
+        >
+        <a href="account-delete-requests.html" class="nav-link"
+          ><i class="fas fa-user-xmark"></i> Acc-delete request</a
+        >
       </nav>
       <div class="sidebar__footer">
         <button id="logoutBtn" class="logout-btn">
@@ -143,23 +158,6 @@
               >…</span
             >
           </span>
-          <!-- Loading indicator shown while post counts are being fetched -->
-          <span
-            id="countsLoadingBadge"
-            style="
-              display: none;
-              font-size: 0.75rem;
-              color: var(--text-3);
-              gap: 6px;
-              align-items: center;
-            "
-          >
-            <div
-              class="spinner"
-              style="width: 14px; height: 14px; border-width: 2px"
-            ></div>
-            Loading post counts…
-          </span>
         </div>
 
         <div class="table-wrap">
@@ -172,8 +170,7 @@
                 <th>User</th>
                 <th>Email</th>
                 <th>Status</th>
-                <!-- Posts column now shows total (text + video) with a tooltip breakdown -->
-                <th title="Text posts + video posts">Posts</th>
+                <th title="Text posts and video posts">Posts / Videos</th>
                 <th>Followers</th>
                 <th>Joined</th>
                 <th>Actions</th>
@@ -219,12 +216,11 @@
     </div>
 
     <script type="module">
-      import { getAllUsers } from "./js/dashboard.js";
+      import { getUsersPage } from "./js/dashboard.js";
       import {
         banUser,
         unbanUser,
         getUserPosts,
-        batchGetPostCounts,
       } from "./js/users.js";
       import { adminLogout, checkAdminAuth } from "./js/auth.js";
       import {
@@ -248,9 +244,13 @@
       // ── State ──
       let allUsers = [];
       let filteredUsers = [];
-      let postCountMap = new Map(); // uid → { posts, videoPosts, total }
       let currentPage = 1;
       const PER_PAGE = 10;
+      let pageCursors = [null];
+      let pageCache = new Map();
+      let hasNextPage = false;
+      let totalUsers = 0;
+      let loadingPage = false;
       let selectedIds = new Set();
       let currentFilter = "all";
 
@@ -277,62 +277,53 @@
       // ================================================================
 
       function getFollowersCount(u) {
-        if (Array.isArray(u.followers)) return u.followers.length;
-        if (Array.isArray(u.followersList)) return u.followersList.length;
-        if (typeof u.followersCount === "number") return u.followersCount;
-        if (typeof u.followers_count === "number") return u.followers_count;
-        if (typeof u.followersCount === "string")
-          return parseInt(u.followersCount, 10) || 0;
-        if (typeof u.followers_count === "string")
-          return parseInt(u.followers_count, 10) || 0;
-        return 0;
+        return Number(u.followersCount) || 0;
+      }
+
+      function getPrimaryName(u) {
+        return u.displayName || u.username || "No name";
       }
 
       /**
        * Returns the TOTAL post count (text + video) for a user.
-       * Prefers the live server-fetched count from postCountMap;
-       * falls back to any cached field on the user document.
+      * Uses the counters/posts document hydrated by getAllUsers().
        */
       function getTotalPostCount(u) {
-        // Use the live server count if available
-        const live = postCountMap.get(u.id);
-        if (live) return live.total;
-
-        // Fallback: stale cached fields on the user document
-        if (typeof u.postCount === "number") return u.postCount;
-        if (typeof u.postsCount === "number") return u.postsCount;
-        if (typeof u.totalPosts === "number") return u.totalPosts;
-        if (typeof u.post_count === "number") return u.post_count;
-        if (typeof u.postCount === "string")
-          return parseInt(u.postCount, 10) || 0;
-        return 0;
+        return (Number(u.postsCount) || 0) + (Number(u.videosCount) || 0);
       }
 
-      /** Returns a small "3 · 1 vid" breakdown string for the tooltip/table. */
+      /** Returns the text and video counter breakdown for the table. */
       function getPostCountLabel(u) {
-        const live = postCountMap.get(u.id);
-        if (!live) return getTotalPostCount(u).toString();
-        const { posts, videoPosts, total } = live;
-        if (videoPosts === 0) return `${total}`;
-        // e.g.  "5 (3 + 2 vid)"
-        return `${total} <span style="font-size:.7rem;color:var(--text-3);">(${posts}+${videoPosts}🎬)</span>`;
+        const posts = Number(u.postsCount) || 0;
+        const videos = Number(u.videosCount) || 0;
+        return `${posts + videos} <span style="font-size:.7rem;color:var(--text-3);">(${posts} + ${videos} video)</span>`;
       }
 
       // ================================================================
       // LOAD
       // ================================================================
 
-      async function loadUsers() {
+      async function loadUsers(page = 1, force = false) {
+        if (loadingPage) return;
+        loadingPage = true;
         document.getElementById("usersBody").innerHTML = skeletonRows(8, 6);
 
         try {
-          allUsers = await getAllUsers();
+          let pageData = !force ? pageCache.get(page) : null;
+          if (!pageData) {
+            pageData = await getUsersPage(
+              pageCursors[page - 1] || null,
+              PER_PAGE,
+            );
+            pageCache.set(page, pageData);
+            pageCursors[page] = pageData.nextCursor;
+          }
+          allUsers = pageData.users;
+          currentPage = page;
+          hasNextPage = pageData.hasNextPage;
+          totalUsers = pageData.totalCount;
           applyFiltersAndSort();
           renderTable();
-
-          // Fetch real post counts from the server in the background.
-          // The table re-renders automatically once counts arrive.
-          fetchPostCounts();
         } catch (err) {
           console.error("Error loading users:", err);
           showToast("Failed to load users.", "error");
@@ -343,28 +334,7 @@
                     </td></tr>
                 `;
         }
-      }
-
-      /**
-       * Runs batchGetPostCounts for every loaded user in the background.
-       * Shows a subtle loading indicator in the card header while running,
-       * then re-renders the table so the counts update without a full reload.
-       */
-      async function fetchPostCounts() {
-        const badge = document.getElementById("countsLoadingBadge");
-        badge.style.display = "flex";
-
-        try {
-          const ids = allUsers.map((u) => u.id);
-          postCountMap = await batchGetPostCounts(ids);
-          // Re-render table so new counts appear in the Posts column
-          applyFiltersAndSort();
-          renderTable();
-        } catch (err) {
-          console.warn("[fetchPostCounts] failed:", err.message);
-        } finally {
-          badge.style.display = "none";
-        }
+              loadingPage = false;
       }
 
       // ================================================================
@@ -390,11 +360,11 @@
 
         if (currentFilter === "active") {
           users = users.filter(
-            (u) => !(u.softBan === true || u.softBan === "true"),
+            (u) => u.isBanned !== true,
           );
         } else if (currentFilter === "banned") {
           users = users.filter(
-            (u) => u.softBan === true || u.softBan === "true",
+            (u) => u.isBanned === true,
           );
         }
 
@@ -414,7 +384,6 @@
           users.sort((a, b) => getTotalPostCount(b) - getTotalPostCount(a));
 
         filteredUsers = users;
-        currentPage = 1;
       }
 
       // ================================================================
@@ -423,24 +392,21 @@
 
       function renderTable() {
         const tbody = document.getElementById("usersBody");
-        const start = (currentPage - 1) * PER_PAGE;
-        const end = start + PER_PAGE;
-        const page = filteredUsers.slice(start, end);
+        const page = filteredUsers;
 
         document.getElementById("userCountBadge").textContent =
-          filteredUsers.length;
+          totalUsers;
         document.getElementById("totalCount").textContent =
-          filteredUsers.length;
+          totalUsers;
         document.getElementById("showingFrom").textContent =
-          filteredUsers.length ? start + 1 : 0;
+          filteredUsers.length ? (currentPage - 1) * PER_PAGE + 1 : 0;
         document.getElementById("showingTo").textContent = Math.min(
-          end,
-          filteredUsers.length,
+          currentPage * PER_PAGE,
+          (currentPage - 1) * PER_PAGE + filteredUsers.length,
         );
-        document.getElementById("pageInfo").textContent = `Page ${currentPage}`;
+        document.getElementById("pageInfo").textContent = `Page ${currentPage} of ${Math.max(1, Math.ceil(totalUsers / PER_PAGE))}`;
         document.getElementById("prevPage").disabled = currentPage === 1;
-        document.getElementById("nextPage").disabled =
-          end >= filteredUsers.length;
+        document.getElementById("nextPage").disabled = !hasNextPage;
 
         if (!page.length) {
           tbody.innerHTML = `
@@ -456,7 +422,7 @@
 
         tbody.innerHTML = page
           .map((u) => {
-            const banned = u.softBan === true || u.softBan === "true";
+            const banned = u.isBanned === true;
             const joined = formatDate(u.createdAt);
             const followers = getFollowersCount(u);
             const postLabel = getPostCountLabel(u); // includes text+video breakdown
@@ -472,7 +438,8 @@
                         <div class="flex-center gap-10">
                             <img src="${pic}" class="avatar" onerror="this.src='https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3'">
                             <div>
-                                <strong style="font-size:.875rem;">${u.username || "No name"}</strong>
+                              <strong style="font-size:.875rem;">${getPrimaryName(u)}</strong>
+                              ${u.displayName && u.username ? `<div class="text-xs" style="color:var(--text-3);">@${u.username}</div>` : ""}
                                 <div class="text-xs text-faint mono">${u.id.substring(0, 10)}…</div>
                             </div>
                         </div>
@@ -550,10 +517,7 @@
       document
         .getElementById("selectAll")
         .addEventListener("change", function () {
-          const page = filteredUsers.slice(
-            (currentPage - 1) * PER_PAGE,
-            currentPage * PER_PAGE,
-          );
+          const page = filteredUsers;
           page.forEach((u) => {
             if (this.checked) selectedIds.add(u.id);
             else selectedIds.delete(u.id);
@@ -683,7 +647,7 @@
         const textPosts = posts.filter((p) => p.type === "post");
         const videoPosts = posts.filter((p) => p.type === "video");
 
-        const banned = user.softBan === true || user.softBan === "true";
+        const banned = user.isBanned === true;
         const pic =
           user.profilePic ||
           "https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3";
@@ -693,11 +657,14 @@
           day: "numeric",
         });
         const followers = getFollowersCount(user);
+        const textPostCount = Number(user.postsCount) || 0;
+        const videoPostCount = Number(user.videosCount) || 0;
 
         document.getElementById("userModalBody").innerHTML = `
                 <div class="user-detail-header">
                     <img src="${pic}" onerror="this.src='https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3'">
-                    <h3>${user.username || "No username"}</h3>
+                    <h3>${getPrimaryName(user)}</h3>
+                    ${user.displayName && user.username ? `<p style="color:var(--text-3);">@${user.username}</p>` : ""}
                     <p>${user.email || "No email"}</p>
                     <span class="badge ${banned ? "badge-banned" : "badge-active"}" style="margin-top:8px;">
                         ${banned ? "🚫 Banned" : "✅ Active"}
@@ -719,16 +686,16 @@
                     </div>
                     <div class="detail-item">
                         <div class="detail-item__label">Total Posts</div>
-                        <div class="detail-item__value">${posts.length}</div>
+                      <div class="detail-item__value">${textPostCount + videoPostCount}</div>
                     </div>
                     <!-- Split post count row -->
                     <div class="detail-item">
                         <div class="detail-item__label"><i class="fas fa-newspaper" style="margin-right:4px;"></i>Text Posts</div>
-                        <div class="detail-item__value">${textPosts.length}</div>
+                        <div class="detail-item__value">${textPostCount}</div>
                     </div>
                     <div class="detail-item">
                         <div class="detail-item__label"><i class="fas fa-video" style="margin-right:4px;color:#818cf8;"></i>Video Posts</div>
-                        <div class="detail-item__value" style="color:#818cf8;">${videoPosts.length}</div>
+                        <div class="detail-item__value" style="color:#818cf8;">${videoPostCount}</div>
                     </div>
                 </div>
 
@@ -839,13 +806,11 @@
       // PAGINATION
       // ================================================================
 
-      document.getElementById("prevPage").addEventListener("click", () => {
-        currentPage--;
-        renderTable();
+      document.getElementById("prevPage").addEventListener("click", async () => {
+        await loadUsers(currentPage - 1);
       });
-      document.getElementById("nextPage").addEventListener("click", () => {
-        currentPage++;
-        renderTable();
+      document.getElementById("nextPage").addEventListener("click", async () => {
+        await loadUsers(currentPage + 1);
       });
 
       // ================================================================
@@ -889,16 +854,18 @@
         }
 
         const rows = filteredUsers.map((u) => {
-          const live = postCountMap.get(u.id);
+          const textPostCount = Number(u.postsCount) || 0;
+          const videoPostCount = Number(u.videosCount) || 0;
           return {
             ID: u.id,
+            DisplayName: getPrimaryName(u),
             Username: u.username || "",
             Email: u.email || "",
             Status:
-              u.softBan === true || u.softBan === "true" ? "Banned" : "Active",
-            TextPosts: live?.posts ?? getTotalPostCount(u),
-            VideoPosts: live?.videoPosts ?? 0,
-            TotalPosts: live?.total ?? getTotalPostCount(u),
+              u.isBanned === true ? "Banned" : "Active",
+            TextPosts: textPostCount,
+            VideoPosts: videoPostCount,
+            TotalPosts: textPostCount + videoPostCount,
             Followers: getFollowersCount(u),
             Joined: formatDate(u.createdAt),
           };

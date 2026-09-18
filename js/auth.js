@@ -3,7 +3,7 @@
    Handles: admin login, logout, session check, admin creation
    ================================================================ */
 
-import { auth, db, isAdmin } from "./firebase.js";
+import { auth, db, isAdmin, ADMIN_COLLECTION } from "./firebase.js";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -22,7 +22,7 @@ import {
  *
  * Flow:
  *  1. Firebase Auth signs in the user
- *  2. We look up /admins/{uid} in Firestore to confirm admin role
+ *  2. We look up /joyinAccessRegistry/{uid} in Firestore to confirm admin role
  *  3. If not admin, we immediately sign them back out for safety
  *
  * @param {string} email
@@ -35,7 +35,7 @@ export async function adminLogin(email, password) {
     const credential = await signInWithEmailAndPassword(auth, email, password);
     const uid = credential.user.uid;
 
-    // Step 2: Check the /admins/{uid} document
+    // Step 2: Check the admin access record
     if (await isAdmin(uid)) {
       // All good — return the user object
       return { success: true, user: credential.user };
@@ -66,7 +66,7 @@ export async function adminLogin(email, password) {
 
 /**
  * Creates a new admin account in Firebase Auth and records it in
- * the /admins collection. This function should only be called once
+ * the admin access collection. This function should only be called once
  * during initial setup — protect it with a setup key in the UI.
  *
  * @param {string} email
@@ -85,8 +85,8 @@ export async function createAdmin(email, password, username) {
     const uid = credential.user.uid;
 
     // Write the admin record to Firestore
-    // The /admins collection is what isAdmin() checks
-    await setDoc(doc(db, "admins", uid), {
+    // Use the same collection that isAdmin() checks
+    await setDoc(doc(db, ADMIN_COLLECTION, uid), {
       email: email,
       username: username,
       role: "admin",

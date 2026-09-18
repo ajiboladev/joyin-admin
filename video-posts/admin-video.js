@@ -10,6 +10,7 @@
    ================================================================ */
 
 import { db } from "../js/firebase.js";
+import { getVideoPostsPage } from "../js/dashboard.js";
 import {
   collection,
   getDocs,
@@ -25,6 +26,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 import { deleteCloudinaryVideo } from "../js/deleteCloudinary.js";
+import { openContentDeletionModal } from "../js/content-deletion-ui.js";
 
 import {
   showToast,
@@ -44,6 +46,12 @@ let activePost = null;
 
 let currentPage = 1;
 const POSTS_PER_PAGE = 20;
+let pageCursors = [null];
+let pageCache = new Map();
+let hasNextPage = false;
+let totalVideos = 0;
+let todayVideos = 0;
+let loadingPage = false;
 let searchTimer;
 let currentTimeFilter = "all";
 let currentView = "grid"; // 'grid' | 'table'
@@ -105,8 +113,8 @@ async function batchGetUsers(userIds) {
 function getAuthor(post) {
   const cached = userCache.get(post.userId);
   return {
-    username:
-      cached?.username || cached?.displayName || post.username || "Unknown",
+    displayName: cached?.displayName || "",
+    username: cached?.username || post.username || "Unknown",
     profilePic:
       cached?.profilePic ||
       cached?.photoURL ||
@@ -116,25 +124,21 @@ function getAuthor(post) {
 }
 
 /**
- * View count — handles viewCount, viewsCount, views field names.
+ * View count loaded from video-posts/{id}/counters/views.
  */
 function getViewCount(p) {
-  if (typeof p.viewCount === "number") return p.viewCount;
-  if (typeof p.viewsCount === "number") return p.viewsCount;
-  if (typeof p.views === "number") return p.views;
-  if (typeof p.viewCount === "string") return parseInt(p.viewCount, 10) || 0;
-  return 0;
+  return Number(p.viewsCount) || 0;
 }
 
 /**
- * Like count — handles likeCount counter or likes array.
+ * Like count loaded from video-posts/{id}/counters/likes.
  */
 function getLikeCount(p) {
-  if (typeof p.likeCount === "number") return p.likeCount;
-  if (typeof p.likesCount === "number") return p.likesCount;
-  if (Array.isArray(p.likes)) return p.likes.length;
-  if (typeof p.likeCount === "string") return parseInt(p.likeCount, 10) || 0;
-  return 0;
+  return Number(p.likesCount) || 0;
+}
+
+function getCommentCount(p) {
+  return Number(p.commentsCount) || 0;
 }
 
 // ── DATE HELPERS ──────────────────────────────────────────────
@@ -154,7 +158,9 @@ function toDate(v) {
 
 // ── DATA LOADING ──────────────────────────────────────────────
 
-async function loadPosts() {
+async function loadPosts(page = 1, force = false) {
+  if (loadingPage) return;
+  loadingPage = true;
   if (currentView === "grid") {
     document.getElementById("videoGrid").innerHTML =
       buildSkeletonGrid(POSTS_PER_PAGE);
@@ -163,12 +169,20 @@ async function loadPosts() {
   }
 
   try {
-    const q = query(
-      collection(db, "video-posts"),
-      orderBy("createdAt", "desc"),
-    );
-    const snap = await getDocs(q);
-    allPosts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    let pageData = !force ? pageCache.get(page) : null;
+    if (!pageData) {
+      pageData = await getVideoPostsPage(
+        pageCursors[page - 1] || null,
+        POSTS_PER_PAGE,
+      );
+      pageCache.set(page, pageData);
+      pageCursors[page] = pageData.nextCursor;
+    }
+    allPosts = pageData.posts;
+    currentPage = page;
+    hasNextPage = pageData.hasNextPage;
+    totalVideos = pageData.totalCount;
+    todayVideos = pageData.todayCount;
 
     // Batch-resolve all authors from /users — one parallel fetch round-trip
     const uids = [...new Set(allPosts.map((p) => p.userId).filter(Boolean))];
@@ -193,6 +207,8 @@ async function loadPosts() {
                     </p>
                 </div>
             </div>`;
+  } finally {
+    loadingPage = false;
   }
 }
 
@@ -219,15 +235,14 @@ function applyFilters() {
     return true;
   });
 
-  // Search — uses resolved username from cache
+  // Search by video ID, caption, or username.
   if (term) {
     posts = posts.filter((p) => {
       const author = getAuthor(p);
       return (
         p.id.toLowerCase().includes(term) ||
         author.username.toLowerCase().includes(term) ||
-        (p.text || "").toLowerCase().includes(term) ||
-        (p.userId || "").toLowerCase().includes(term)
+        (p.text || p.caption || "").toLowerCase().includes(term)
       );
     });
   }
@@ -245,6 +260,9 @@ function applyFilters() {
     } else if (field === "viewCount") {
       aV = getViewCount(a);
       bV = getViewCount(b);
+    } else if (field === "commentCount") {
+      aV = getCommentCount(a);
+      bV = getCommentCount(b);
     } else {
       aV = a[field] || 0;
       bV = b[field] || 0;
@@ -253,31 +271,15 @@ function applyFilters() {
   });
 
   filteredPosts = posts;
-  currentPage = 1;
 }
 
 // ── STATS ─────────────────────────────────────────────────────
 
 function renderStats() {
   const total = allPosts.length;
-  const likes = allPosts.reduce((s, p) => s + getLikeCount(p), 0);
-  const views = allPosts.reduce((s, p) => s + getViewCount(p), 0);
-  const comments = allPosts.reduce((s, p) => s + (p.commentCount || 0), 0);
-  const storage = allPosts.reduce((s, p) => s + (p.fileSize || 0), 0);
-  const users = new Set(allPosts.filter((p) => p.userId).map((p) => p.userId))
-    .size;
-  const today = allPosts.filter((p) => {
-    const d = toDate(p.createdAt);
-    return d && d.toDateString() === new Date().toDateString();
-  }).length;
 
-  setText("statTotal", total);
-  setText("statToday", today);
-  setText("statLikes", fmtCount(likes));
-  setText("statViews", fmtCount(views));
-  setText("statComments", fmtCount(comments));
-  setText("statStorage", fmtBytes(storage));
-  setText("statUsers", users);
+  setText("statTotal", totalVideos);
+  setText("statToday", todayVideos);
 }
 
 // ── VIEW MODE TOGGLE ──────────────────────────────────────────
@@ -323,10 +325,9 @@ function renderGrid() {
 
   empty.style.display = "none";
   pagWrap.style.display = "flex";
-
-  const start = (currentPage - 1) * POSTS_PER_PAGE;
-  const end = start + POSTS_PER_PAGE;
-  const page = filteredPosts.slice(start, end);
+  const start = 0;
+  const end = filteredPosts.length;
+  const page = filteredPosts;
 
   grid.innerHTML = page.map(buildVideoCard).join("");
 
@@ -345,7 +346,7 @@ function buildVideoCard(post) {
   return `
     <div class="video-card" data-id="${post.id}">
         <div class="video-thumb">
-            <video src="${post.videoUrl}#t=0.5" preload="metadata" muted playsinline></video>
+            ${post.thumbnailUrl ? `<img src="${escHtml(post.thumbnailUrl)}" alt="Video thumbnail" loading="lazy">` : `<div class="text-faint text-xs">No thumbnail</div>`}
             <div class="video-thumb__overlay">
                 <div class="video-thumb__play"><i class="fas fa-play"></i></div>
             </div>
@@ -356,7 +357,8 @@ function buildVideoCard(post) {
             <div class="video-card__user">
                 <img src="${author.profilePic}" onerror="this.src='${defaultAvatar()}'" alt="">
                 <div>
-                    <div class="video-card__username">@${escHtml(author.username)}</div>
+                    <div class="video-card__username">${escHtml(author.displayName || author.username)}</div>
+                    ${author.displayName && author.username ? `<div class="text-xs" style="color:var(--text-3);">@${escHtml(author.username)}</div>` : ""}
                     <div class="video-card__date">${date}</div>
                 </div>
             </div>
@@ -364,8 +366,7 @@ function buildVideoCard(post) {
             <div class="video-card__stats">
                 <span class="video-card__stat"><i class="fas fa-heart"></i> ${fmtCount(likes)}</span>
                 <span class="video-card__stat"><i class="fas fa-eye"></i> ${fmtCount(views)}</span>
-                <span class="video-card__stat"><i class="fas fa-comment"></i> ${fmtCount(post.commentCount || 0)}</span>
-                <span class="video-card__stat"><i class="fas fa-file"></i> ${fmtBytes(post.fileSize || 0)}</span>
+                <span class="video-card__stat"><i class="fas fa-comment"></i> ${fmtCount(getCommentCount(post))}</span>
             </div>
         </div>
 
@@ -397,9 +398,9 @@ function renderTableView() {
   empty.style.display = "none";
   pagWrap.style.display = "flex";
 
-  const start = (currentPage - 1) * POSTS_PER_PAGE;
-  const end = start + POSTS_PER_PAGE;
-  const page = filteredPosts.slice(start, end);
+  const start = 0;
+  const end = filteredPosts.length;
+  const page = filteredPosts;
 
   tbody.innerHTML = page
     .map((p) => {
@@ -418,7 +419,8 @@ function renderTableView() {
                     <img src="${author.profilePic}" class="avatar" style="width:32px;height:32px;"
                          onerror="this.src='${defaultAvatar()}'">
                     <div>
-                        <div style="font-size:.85rem;font-weight:600;">@${escHtml(author.username)}</div>
+                        <div style="font-size:.85rem;font-weight:600;">${escHtml(author.displayName || author.username)}</div>
+                        ${author.displayName && author.username ? `<div class="text-xs" style="color:var(--text-3);">@${escHtml(author.username)}</div>` : ""}
                         <div class="text-xs text-faint mono">${p.userId?.substring(0, 10) || "—"}…</div>
                     </div>
                 </div>
@@ -447,8 +449,7 @@ function renderTableView() {
                     <i class="fas fa-eye" style="color:var(--accent);margin-right:4px;font-size:.75rem;"></i>${fmtCount(views)}
                 </span>
             </td>
-            <td class="text-sm text-muted">${fmtCount(p.commentCount || 0)}</td>
-            <td class="text-sm text-muted">${fmtBytes(p.fileSize || 0)}</td>
+            <td class="text-sm text-muted">${fmtCount(getCommentCount(p))}</td>
             <td>
                 <div class="flex-center gap-8">
                     <button class="btn btn-icon" title="Preview"
@@ -484,13 +485,17 @@ function renderTableView() {
 // ── PAGINATION ────────────────────────────────────────────────
 
 function updatePagination(total, start, end) {
-  const pages = Math.ceil(total / POSTS_PER_PAGE);
-  setText("pagFrom", total ? start + 1 : 0);
-  setText("pagTo", Math.min(end, total));
-  setText("pagTotal", total);
+  const pages = Math.max(1, Math.ceil(totalVideos / POSTS_PER_PAGE));
+  const rangeStart = total ? (currentPage - 1) * POSTS_PER_PAGE + 1 : 0;
+  const rangeEnd = total
+    ? Math.min(currentPage * POSTS_PER_PAGE, rangeStart - 1 + total)
+    : 0;
+  setText("pagFrom", rangeStart);
+  setText("pagTo", rangeEnd);
+  setText("pagTotal", totalVideos);
   setText("pagInfo", `Page ${currentPage} / ${pages}`);
   document.getElementById("prevBtn").disabled = currentPage === 1;
-  document.getElementById("nextBtn").disabled = end >= total;
+  document.getElementById("nextBtn").disabled = !hasNextPage;
 }
 
 // ── SKELETON ─────────────────────────────────────────────────
@@ -530,13 +535,13 @@ function openPlayer(postId) {
   const rows = [
     ["Post ID", post.id, true],
     ["User ID", post.userId || "—", true],
+    ["Display name", author.displayName || author.username, false],
     ["Username", "@" + author.username, false],
     ["Uploaded", d ? fmtFullDate(d) : "—", false],
     ["Duration", fmtDuration(post.duration || 0), false],
-    ["File size", fmtBytes(post.fileSize || 0), false],
     ["Likes", fmtCount(likes), false],
     ["Views", fmtCount(views), false],
-    ["Comments", fmtCount(post.commentCount || 0), false],
+    ["Comments", fmtCount(getCommentCount(post)), false],
   ];
 
   document.getElementById("playerDetails").innerHTML = `
@@ -574,7 +579,8 @@ function openPlayer(postId) {
                      style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;"
                      onerror="this.src='${defaultAvatar()}'">
                 <div>
-                    <div style="font-weight:600;font-size:.85rem;">@${escHtml(author.username)}</div>
+                    <div style="font-weight:600;font-size:.85rem;">${escHtml(author.displayName || author.username)}</div>
+                    ${author.displayName && author.username ? `<div class="text-xs" style="color:var(--text-3);">@${escHtml(author.username)}</div>` : ""}
                     <div class="text-xs text-faint mono">${post.userId || "—"}</div>
                 </div>
             </div>
@@ -601,6 +607,13 @@ async function deletePost(postId, triggerBtn = null) {
     showToast("Post not found.", "error");
     return;
   }
+
+  await openContentDeletionModal({
+    id: postId,
+    type: "video",
+    onDeleted: () => loadPosts(currentPage, true),
+  });
+  return;
 
   const confirmed = await showConfirm({
     title: "Delete this video?",
@@ -715,8 +728,7 @@ async function deletePost(postId, triggerBtn = null) {
     allPosts = allPosts.filter((p) => p.id !== postId);
     filteredPosts = filteredPosts.filter((p) => p.id !== postId);
 
-    const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
-    if (currentPage > totalPages && totalPages > 0) currentPage = totalPages;
+    if (!filteredPosts.length && currentPage > 1) currentPage--;
 
     renderStats();
     render();
@@ -818,14 +830,14 @@ function setupEventListeners() {
 
   // Pagination
   document.getElementById("prevBtn").addEventListener("click", () => {
-    currentPage--;
-    render();
-    scrollTo({ top: 0, behavior: "smooth" });
+    loadPosts(currentPage - 1).then(() =>
+      scrollTo({ top: 0, behavior: "smooth" }),
+    );
   });
   document.getElementById("nextBtn").addEventListener("click", () => {
-    currentPage++;
-    render();
-    scrollTo({ top: 0, behavior: "smooth" });
+    loadPosts(currentPage + 1).then(() =>
+      scrollTo({ top: 0, behavior: "smooth" }),
+    );
   });
 
   // Back button

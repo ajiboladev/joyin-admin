@@ -30,7 +30,10 @@ export async function deleteCloudinaryVideo(publicId) {
   );
 
   const result = await response.json();
-  console.log(result);
+  if (!response.ok || (result.result !== "ok" && result.result !== "not found")) {
+    throw new Error(result.error?.message || result.result || "Cloudinary video deletion failed.");
+  }
+  return result;
 }
 
 export async function deleteCloudinaryImage(publicId) {
@@ -65,5 +68,8 @@ export async function deleteCloudinaryImage(publicId) {
   );
 
   const result = await response.json();
-  console.log(result);
+  if (!response.ok || (result.result !== "ok" && result.result !== "not found")) {
+    throw new Error(result.error?.message || result.result || "Cloudinary image deletion failed.");
+  }
+  return result;
 }

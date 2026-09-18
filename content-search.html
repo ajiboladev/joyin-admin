@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Content Lookup — JOYIN Admin</title>
+    <link rel="stylesheet" href="css/admin.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link rel="icon" href="/J _ A192.png" />
+    <style>
+      .tool-shell { max-width: 980px; margin: 0 auto; font-size: 16px; }
+      .tool-shell h2 { font-size: 16px; }
+      .lookup-form { display: grid; grid-template-columns: 180px 1fr auto; gap: 10px; align-items: end; }
+      .result-card { margin-top: 20px; }
+      .result-head { display: flex; gap: 14px; align-items: center; padding: 20px; border-bottom: 1px solid var(--border); }
+      .result-head img.avatar-lg { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }
+      .result-body { padding: 20px; }
+      .media-frame { min-height: 160px; max-width: 720px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r-md); display: flex; align-items: center; justify-content: center; padding: 14px; margin: 16px 0; overflow: hidden; }
+      .media-frame img, .media-frame video { display: block; max-width: 100%; max-height: 520px; width: auto; height: auto; object-fit: contain; }
+      .media-loading { color: var(--text-3); font-size: .82rem; }
+      .metric-row { display: flex; flex-wrap: wrap; gap: 18px; color: var(--text-2); font-size: .85rem; }
+      .metric-row i { color: var(--accent-l); margin-right: 5px; }
+      .muted { color: var(--text-3); }
+      @media (max-width: 700px) { .lookup-form { grid-template-columns: 1fr; } }
+    </style>
+  </head>
+  <body>
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar__logo"><i class="fas fa-crown"></i> JOYIN Admin</div>
+      <nav class="sidebar__nav">
+        <a href="dashboard.html" class="nav-link"><i class="fas fa-chart-line"></i> Dashboard</a>
+        <a href="users.html" class="nav-link"><i class="fas fa-users"></i> Users</a>
+        <a href="posts.html" class="nav-link"><i class="fas fa-newspaper"></i> Posts</a>
+        <a href="video-posts/" class="nav-link"><i class="fas fa-video"></i> Video Posts</a>
+        <a href="content-search.html" class="nav-link active"><i class="fas fa-search"></i> Search Content</a>
+        <a href="content-delete.html" class="nav-link"><i class="fas fa-trash"></i> Delete Content</a>
+        <a href="delete-requests.html" class="nav-link"><i class="fas fa-file-circle-xmark"></i> P-delete request</a>
+        <a href="video-delete-requests.html" class="nav-link"><i class="fas fa-video-slash"></i> V-delete request</a>
+        <a href="account-delete-requests.html" class="nav-link"><i class="fas fa-user-xmark"></i> Acc-delete request</a>
+      </nav>
+      <div class="sidebar__footer"><button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> Logout</button></div>
+    </aside>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+    <header class="topbar"><div class="topbar__title"><button class="hamburger" id="hamburger"><span></span><span></span><span></span></button><i class="fas fa-search"></i> Search Content</div></header>
+    <main class="page-content"><div class="tool-shell">
+      <div class="card">
+        <div class="card-header"><span class="card-title"><i class="fas fa-fingerprint"></i> Find by ID</span></div>
+        <form id="lookupForm" class="lookup-form" style="padding:20px">
+          <div><label class="form-label" for="contentType">Content type</label><select id="contentType" class="form-input"><option value="user">User</option><option value="post">Text & image post</option><option value="video">Video post</option></select></div>
+          <div><label class="form-label" for="contentId">ID or username</label><input id="contentId" class="form-input" placeholder="Paste ID or enter exact username" required /></div>
+          <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
+        </form>
+      </div>
+      <div id="result" class="result-card"></div>
+    </div></main>
+    <script type="module">
+      import { checkAdminAuth, adminLogout } from "./js/auth.js";
+      import { setupSidebar, showToast, showConfirm, setButtonLoading } from "./js/ui.js";
+      import { banUser, unbanUser } from "./js/users.js";
+      import { findUser, findPost } from "./js/content-tools.js";
+      const admin = await checkAdminAuth();
+      if (!admin) window.location.href = "index.html";
+      document.getElementById("logoutBtn").addEventListener("click", adminLogout);
+      setupSidebar();
+      const result = document.getElementById("result");
+      const esc = (value = "") => { const node = document.createElement("div"); node.textContent = value; return node.innerHTML; };
+      const avatar = "https://tse1.mm.bing.net/th/id/OIP.cEvbluCvNFD_k4wC3k-_UwHaHa?rs=1&pid=ImgDetMain&o=7&rm=3";
+      function metrics(item) { return `<div class="metric-row"><span><i class="fas fa-heart"></i>${item.likesCount || 0} likes</span><span><i class="fas fa-comment"></i>${item.commentsCount || 0} comments</span><span><i class="fas fa-eye"></i>${item.viewsCount || 0} views</span></div>`; }
+      function mediaBox(post) {
+        if (post.type === "video") {
+          if (!post.videoUrl) return "";
+          return `<div class="media-frame"><span class="media-loading">Loading video...</span><video controls playsinline preload="metadata" poster="${esc(post.thumbnailUrl || "")}" src="${esc(post.videoUrl)}" onloadeddata="this.previousElementSibling.remove()" onerror="this.previousElementSibling.textContent='Video unavailable'"></video></div>`;
+        }
+        if (!post.imageUrl) return "";
+        return `<div class="media-frame"><span class="media-loading">Loading image...</span><img src="${esc(post.imageUrl)}" alt="Post image" onload="this.previousElementSibling.remove()" onerror="this.previousElementSibling.textContent='Image unavailable'"></div>`;
+      }
+      function renderUser(user) {
+        const banned = user.isBanned === true;
+        result.innerHTML = `<div class="card"><div class="result-head"><img class="avatar-lg" src="${esc(user.profilePic || user.photoURL || avatar)}" onerror="this.src='${avatar}'"><div><h2>${esc(user.displayName || user.username || "No name")}</h2><div class="muted">@${esc(user.username || "—")}</div><span class="badge ${banned ? "badge-banned" : "badge-active"}" style="margin-top:8px;display:inline-flex;"><i class="fas ${banned ? "fa-ban" : "fa-check"}"></i> ${banned ? "Banned" : "Active"}</span></div></div><div class="result-body"><p>${esc(user.bio || "No bio available.")}</p><div class="metric-row" style="margin-top:16px"><span><i class="fas fa-users"></i>${user.followersCount || 0} followers</span><span><i class="fas fa-envelope"></i>${esc(user.email || "No email")}</span></div><p class="muted" style="margin-top:16px">ID: ${esc(user.id)}</p><button id="toggleUserBan" class="btn ${banned ? "btn-success" : "btn-warning"}" style="margin-top:16px"><i class="fas ${banned ? "fa-user-check" : "fa-user-slash"}"></i> ${banned ? "Unban User" : "Ban User"}</button></div></div>`;
+        document.getElementById("toggleUserBan").addEventListener("click", async function () {
+          const confirmed = await showConfirm({
+            title: banned ? "Unban this user?" : "Ban this user?",
+            message: banned ? "They will regain full access to JOYIN." : "They will lose the ability to post or interact.",
+            confirmText: banned ? "Yes, Unban" : "Yes, Ban",
+            intent: banned ? "warning" : "danger",
+          });
+          if (!confirmed) return;
+          const restore = setButtonLoading(this, banned ? "Unbanning..." : "Banning...");
+          const response = banned ? await unbanUser(user.id) : await banUser(user.id, "Admin action");
+          restore();
+          if (!response.success) {
+            showToast(response.error || "Could not update user status.", "error");
+            return;
+          }
+          user.isBanned = !banned;
+          renderUser(user);
+          showToast(response.message, "success");
+        });
+      }
+      function renderPost(post) { const type = post.type; result.innerHTML = `<div class="card"><div class="result-body"><div class="muted">${type === "video" ? "Video post" : "Text & image post"} · ID: ${esc(post.id)}</div><h2 style="margin:10px 0">${esc(post.text || post.caption || "No caption")}</h2>${mediaBox(post)}${metrics(post)}<p class="muted" style="margin-top:16px">Author ID: ${esc(post.userId || "—")}</p></div></div>`; }
+      document.getElementById("lookupForm").addEventListener("submit", async (event) => { event.preventDefault(); const type = document.getElementById("contentType").value; const id = document.getElementById("contentId").value.trim(); if (!id) return; result.innerHTML = `<div class="card"><div class="result-body"><div class="spinner" style="margin:auto"></div></div></div>`; try { const item = type === "user" ? await findUser(id) : await findPost(id, type); if (!item) { result.innerHTML = `<div class="card"><div class="result-body"><p class="text-faint">${type === "user" ? "User" : type === "video" ? "Video post" : "Post"} not found.</p></div></div>`; return; } type === "user" ? renderUser(item) : renderPost(item); } catch (error) { showToast("Search failed: " + error.message, "error"); } });
+    </script>
+  </body>
+</html>

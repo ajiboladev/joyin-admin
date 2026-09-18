@@ -26,7 +26,7 @@ export async function banUser(
   try {
     const userRef = doc(db, "users", userId);
     await updateDoc(userRef, {
-      softBan: true,
+      isBanned: true,
       banReason: banReason,
       banStartDate: new Date(),
       updatedAt: new Date(),
@@ -45,7 +45,7 @@ export async function unbanUser(userId) {
   try {
     const userRef = doc(db, "users", userId);
     await updateDoc(userRef, {
-      softBan: false,
+      isBanned: false,
       banReason: "",
       banStartDate: null,
       updatedAt: new Date(),
