@@ -58,11 +58,22 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+// function escapeHtml(value = "") {
+//   const node = document.createElement("div");
+//   node.textContent = String(value);
+//   return node.innerHTML;
+// }
+
 function escapeHtml(value = "") {
-  const node = document.createElement("div");
-  node.textContent = String(value);
-  return node.innerHTML;
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
+
+
 
 function getReplyLabel(item) {
   const replyValue =
@@ -167,6 +178,11 @@ function renderFeedback(items, append = false) {
       const email = item.email || item.userEmail || "No email";
       const text = item.text || item.message || item.feedback || "No message";
       const replyLabel = getReplyLabel(item);
+
+      const allowReplyLabel =
+          item.allowReply === true ? "Reply allowed" :
+          item.allowReply === false ? "No reply wanted" : "";
+
       const categoryLabel = item.category || item.type || currentCategory;
       const normalizedCategory = normalizeCategory(categoryLabel);
       const categoryBtnText =
@@ -181,6 +197,7 @@ function renderFeedback(items, append = false) {
           <div class="feedback-meta">
             <span class="feedback-badge"><i class="fas fa-tag"></i> ${escapeHtml(categoryBtnText)}</span>
             <span class="status-pill ${replyLabel === "Replied" ? "replied" : "pending"}"><i class="fas ${replyLabel === "Replied" ? "fa-check" : "fa-clock"}"></i> ${replyLabel}</span>
+            ${allowReplyLabel ? `<span class="feedback-badge"><i class="fas fa-envelope"></i> ${allowReplyLabel}</span>` : ""}
           </div>
           <div class="feedback-meta"><i class="fas fa-clock"></i> ${escapeHtml(dateText)}</div>
         </div>

@@ -41,17 +41,31 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-function escapeHtml(value = "") {
-  const node = document.createElement("div");
-  node.textContent = value;
-  return node.innerHTML;
-}
-
 function requestLink(request) {
   return (
     request.link || request.url || request.postLink || request.videoLink || ""
   );
 }
+
+function escapeHtml(value = "") {
+  return String(value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function safeHref(link) {
+  try {
+    const url = new URL(link);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.href : "#";
+  } catch {
+    return "#";
+  }
+}
+
+
 
 function requestIdFromLink(link) {
   if (!link) return "";
@@ -86,7 +100,7 @@ function renderRequests(requests, append = false) {
       return `<article class="request-row" data-request-id="${escapeHtml(request.id)}">
       <div>
         <div class="request-meta"><span><i class="fas fa-user"></i>${escapeHtml(request.userId || "Unknown user")}</span><span><i class="fas fa-clock"></i>${date ? date.toLocaleString() : "Unknown time"}</span></div>
-        <a class="request-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(link || "No link provided")}</a>
+        <a class="request-link"  href="${escapeHtml(safeHref(link))}" target="_blank" rel="noopener noreferrer">${escapeHtml(link || "No link provided")}</a>
         ${contentId ? `<div class="request-meta" style="margin-top:8px;margin-bottom:0"><span><i class="fas fa-hashtag"></i>${escapeHtml(contentId)}</span><button class="btn btn-icon" data-copy-id="${escapeHtml(contentId)}" title="Copy ID"><i class="fas fa-copy"></i></button></div>` : ""}
       </div>
       <div class="request-actions">

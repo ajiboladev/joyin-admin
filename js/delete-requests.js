@@ -10,6 +10,7 @@ import {
   runTransaction,
   startAfter,
   where,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js";
 
 export const REQUEST_PAGE_SIZE = 50;
@@ -20,15 +21,16 @@ export async function fetchDeleteRequests(
   timestampField = "timestamp",
   olderThan = null,
 ) {
-  const constraints = [
-    orderBy(timestampField, "desc"),
-    limit(REQUEST_PAGE_SIZE),
-  ];
-  if (olderThan) constraints.unshift(where(timestampField, "<=", olderThan));
-  if (cursor) constraints.splice(1, 0, startAfter(cursor));
+  const constraints = [];
+  if (olderThan) constraints.push(where(timestampField, "<=", olderThan));
+  constraints.push(orderBy(timestampField, "desc"));
+  if (cursor) constraints.push(startAfter(cursor));
+  constraints.push(limit(REQUEST_PAGE_SIZE));
+
   const snapshot = await getDocs(
     query(collection(db, collectionName), ...constraints),
   );
+
   return {
     requests: snapshot.docs.map((requestDoc) => ({
       id: requestDoc.id,
